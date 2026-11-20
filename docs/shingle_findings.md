@@ -96,3 +96,22 @@ Running log of facts discovered while building the SHIF1 forecast. Newest at bot
   for 2015–18) or RadarOnly_QPE_24H — skipped for now.
 - Use the 24 h file stamped 05:00Z on D+1 = local-standard-time calendar day D (USGS dv uses
   LST). GRIB2 read via cfgrib + eccodes + eccodeslib (bundled binary).
+
+## 2026-11-20 — first real model comparison (val 2016–2019; train ≤2015)
+Setup: gridMET rain at the top cell 28.2750,-81.4333 (pr_past1/3/7/30, pr_nextH = *observed*
+future rain, wb_past30/90); stage/lake/flow controls; leave-one-year-out cross-conformal bands.
+Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + residual carry.
+
+| MAE ft | h1 | h3 | h7 | ≥59 h7 | low (≤52.41) h7 | cov80 h7 |
+|---|---|---|---|---|---|---|
+| persistence | .134 | .334 | .603 | 4.65 | .237 | .80 |
+| ARX ridge | .105 | .273 | .477 | 3.88 | .292 | .80 |
+| ARX lgbm | .088 | .219 | .336 | **2.10** | .191 | .78 |
+| hybrid ridge | .105 | .247 | .401 | 4.19 | .185 | .79 |
+| **hybrid lgbm** | **.088** | **.209** | **.326** | 2.87 | **.101** | .80 |
+
+- Residual carry-forward fixed hybrid h1 (.171 → .088).
+- Hybrid wins overall and halves low-water error; ARX-lgbm still better at flood level (few
+  flood days in val — essentially Irma 2017; rating over-predicts the biggest crests).
+- Caveat: future rain is *observed* (perfect forecast). Real skill at h≥3 will be lower;
+  rain-realism test pending.
