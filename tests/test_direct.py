@@ -64,3 +64,26 @@ def test_lgbm_backend_runs(data):
 def test_unknown_target_raises():
     with pytest.raises(ValueError):
         direct.DirectRegressor("nope", ["stage"])
+
+
+def test_offset_feature_makes_model_learn_correction_and_extrapolate(data):
+    """With offset='gr4j_dH' the target is change minus the physical model's change,
+    so an out-of-range physical signal passes straight through (trees can't cap it)."""
+    idx = data["q"].index
+    d = dict(data)
+    lq = np.log1p(d["q"])
+    # a "physical model" that knows the true future change, but 10x larger at test time
+    d["gr4j"] = pd.DataFrame({"q": d["q"], "s": 0.0, "r": 0.0}, index=idx)
+    m = direct.DirectRegressor("log_q", ["log_q", "gr4j_dH"], horizons=(3,), backend="lgbm", offset="gr4j_dH").fit(d, idx[:2000])
+
+    test = idx[2100:2200]
+    pred = m.predict(d, test)
+
+    truth = d["q"].shift(-3).loc[test]
+    assert (np.log1p(pred["h3"]) - np.log1p(truth)).abs().mean() < 0.02
+
+    big = dict(d)
+    big["gr4j"] = d["gr4j"].copy()
+    big["gr4j"]["q"] = np.expm1(lq * 1.0 + np.where(np.arange(len(idx)) >= 2103, 2.0, 0.0))
+    jump = m.predict(big, idx[2100:2101])["h3"].iloc[0]
+    assert np.log1p(jump) - np.log1p(d["q"].iloc[2100]) > 1.5  # follows the +2 log jump
