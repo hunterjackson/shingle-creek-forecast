@@ -22,3 +22,18 @@ Running log of facts discovered while building the SHIF1 forecast. Newest at bot
   Campbell.
 - gridMET: 88 cells (11×8), no NaNs, basin-mean annual rain ~1350 mm (885–1844), ET0 ~1570 mm.
   31 cells touch the basin, 14 are >50 % inside.
+
+## 2026-11-20 — first relevance analysis (gridMET, train ≤2015)
+- Daily stage response: cross-correlation of every in-basin cell's rain with Δstage peaks at
+  **lag 1 day** (r≈0.55) — at daily resolution the gauge responds within ~1 day.
+- Greedy partial-corr selection (controls stage, dstage_1/3, log_q, log_q_up forced first):
+  the first rain feature is always the cell just NE of the gauge (28.2750,-81.4333) —
+  pr_past1 at h=1 (partial r .35), pr_next3/pr_next7 at h=3/7 (partial r .38/.41).
+  After that, gains are tiny (partial r ≤ .16) and picks are scattered, often outside the basin.
+- **gridMET is too spatially smooth for cell-level selection:** in-basin daily rain pairwise
+  corr median 0.96 (min 0.86); still 0.96 at 10 km and 0.82 at 50 km separation; in-basin and
+  out-of-basin cells score identically (mean Spearman 0.361 each); one redundancy cluster at
+  r≥0.9, only 14 even at r≥0.99. Real Florida convective rain decorrelates over a few km, so
+  this is a smoothing artifact of the product (daily timing from ~12 km NLDAS), not the climate.
+- Implication: per-cell analysis needs radar-based rainfall (SFWMD NEXRAD ~2 km, or NOAA
+  Stage IV 4 km 2002+ / MRMS 1 km). Decision pending with user.
