@@ -1,0 +1,117 @@
+{
+  "reach": {
+    "reachId": "21476600",
+    "name": "",
+    "latitude": 28.267,
+    "longitude": -81.4478,
+    "streamflow": [
+      "analysis_assimilation",
+      "short_range",
+      "long_range",
+      "medium_range_blend",
+      "medium_range"
+    ],
+    "route": {
+      "upstream": [
+        {
+          "reachId": "21476598",
+          "streamOrder": "3"
+        },
+        {
+          "reachId": "21477690",
+          "streamOrder": "3"
+        }
+      ],
+      "downstream": [
+        {
+          "reachId": "21478016",
+          "streamOrder": "3"
+        }
+      ]
+    }
+  },
+  "analysisAssimilation": {},
+  "shortRange": {
+    "series": {
+      "referenceTime": "2026-11-20T19:00:00Z",
+      "units": "ft³/s",
+      "data": [
+        {
+          "validTime": "2026-11-20T20:00:00Z",
+          "flow": 357.3800048828125
+        },
+        {
+          "validTime": "2026-11-20T21:00:00Z",
+          "flow": 331.9599914550781
+        },
+        {
+          "validTime": "2026-11-20T22:00:00Z",
+          "flow": 311.47998046875
+        },
+        {
+          "validTime": "2026-11-20T23:00:00Z",
+          "flow": 298.05999755859375
+        },
+        {
+          "validTime": "2026-11-21T00:00:00Z",
+          "flow": 291.6999816894531
+        },
+        {
+          "validTime": "2026-11-21T01:00:00Z",
+          "flow": 291.6999816894531
+        },
+        {
+          "validTime": "2026-11-21T02:00:00Z",
+          "flow": 297
+        },
+        {
+          "validTime": "2026-11-21T03:00:00Z",
+          "flow": 306.5299987792969
+        },
+        {
+          "validTime": "2026-11-21T04:00:00Z",
+          "flow": 319.6000061035156
+        },
+        {
+          "validTime": "2026-11-21T05:00:00Z",
+          "flow": 334.42999267578125
+        },
+        {
+          "validTime": "2026-11-21T06:00:00Z",
+          "flow": 350.66998291015625
+        },
+        {
+          "validTime": "2026-11-21T07:00:00Z",
+          "flow": 367.6300048828125
+        },
+        {
+          "validTime": "2026-11-21T08:00:00Z",
+          "flow": 384.5799865722656
+        },
+        {
+          "validTime": "2026-11-21T09:00:00Z",
+          "flow": 401.16998291015625
+        },
+        {
+          "validTime": "2026-11-21T10:00:00Z",
+          "flow": 417.7699890136719
+        },
+        {
+          "validTime": "2026-11-21T11:00:00Z",
+          "flow": 433.30999755859375
+        },
+        {
+          "validTime": "2026-11-21T12:00:00Z",
+          "flow": 448.8499755859375
+        },
+        {
+          "validTime": "2026-11-21T13:00:00Z",
+          "flow": 464.0299987792969
+        }
+      ]
+    }
+  },
+  "mediumRange": {},
+  "longRange": {},
+  "mediumRangeBlend": {}
+}

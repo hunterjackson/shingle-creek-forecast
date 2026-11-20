@@ -1,0 +1,38 @@
+{
+  "reach": {
+    "reachId": "21476600",
+    "name": "",
+    "latitude": 28.267,
+    "longitude": -81.4478,
+    "streamflow": [
+      "medium_range",
+      "analysis_assimilation",
+      "short_range",
+      "long_range",
+      "medium_range_blend"
+    ],
+    "route": {
+      "upstream": [
+        {
+          "reachId": "21476598",
+          "streamOrder": "3"
+        },
+        {
+          "reachId": "21477690",
+          "streamOrder": "3"
+        }
+      ],
+      "downstream": [
+        {
+          "reachId": "21478016",
+          "streamOrder": "3"
+        }
+      ]
+    }
+  },
+  "analysisAssimilation": {},
+  "shortRange": {},
+  "mediumRange": {},
+  "longRange": {},
+  "mediumRangeBlend": {}
+}
