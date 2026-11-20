@@ -95,3 +95,28 @@ def test_named_frame_splices_each_series():
 
     assert list(named.columns) == list(dbhydro.SERIES)
     assert named["toho_stage"].tolist() == [4.0, 5.0]
+
+
+@respx.mock
+def test_fetch_chunks_by_key_group_and_years(payload):
+    route = respx.get(URL).mock(return_value=httpx.Response(200, json=payload))
+
+    df = dbhydro.fetch(["68918", "91625", "LQ978"], start="2000-01-01", end="2024-12-31", max_keys=2, chunk_years=10)
+
+    # 2 key groups x 3 date chunks (2000-09, 2010-19, 2020-24)
+    assert route.call_count == 6
+    starts = sorted({c.request.url.params["startDate"] for c in route.calls})
+    assert starts == ["20000101", "20100101", "20200101"]
+    assert df.index.is_unique
+
+
+@respx.mock
+def test_fetch_retries_transient_connection_errors(payload):
+    route = respx.get(URL).mock(
+        side_effect=[httpx.ConnectError("reset"), httpx.Response(200, json=payload)]
+    )
+
+    df = dbhydro.fetch(["68918"], start="2024-10-01", end="2024-10-05", retry_wait=0)
+
+    assert route.call_count == 2
+    assert not df.empty

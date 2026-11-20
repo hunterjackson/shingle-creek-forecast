@@ -12,6 +12,8 @@ telemetry series that continues to the present.
 
 from __future__ import annotations
 
+import time
+
 import httpx
 import numpy as np
 import pandas as pd
@@ -59,19 +61,61 @@ def parse(payload: dict) -> pd.DataFrame:
     return wide.astype(float)
 
 
-def fetch(dbkeys: list[str], start: str, end: str, client: httpx.Client | None = None) -> pd.DataFrame:
-    params = {
-        "timeseriesIds": ",".join(dbkeys),
-        "reportType": "timeseries",
-        "format": "json",
-        "startDate": pd.Timestamp(start).strftime("%Y%m%d"),
-        "endDate": pd.Timestamp(end).strftime("%Y%m%d"),
-        "datum": "NGVD29",
-    }
+def _date_chunks(start: str, end: str, years: int) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    s, e = pd.Timestamp(start), pd.Timestamp(end)
+    chunks = []
+    cur = s
+    while cur <= e:
+        nxt = min(e, pd.Timestamp(year=(cur.year // years + 1) * years, month=1, day=1) - pd.Timedelta(days=1))
+        chunks.append((cur, nxt))
+        cur = nxt + pd.Timedelta(days=1)
+    return chunks
+
+
+def _get(client: httpx.Client, params: dict, retries: int, retry_wait: float) -> dict:
+    for attempt in range(retries + 1):
+        try:
+            resp = client.get(URL, params=params)
+            resp.raise_for_status()
+            return resp.json()
+        except (httpx.TransportError, httpx.HTTPStatusError):
+            if attempt == retries:
+                raise
+            time.sleep(retry_wait * (attempt + 1))
+    raise AssertionError("unreachable")
+
+
+def fetch(
+    dbkeys: list[str],
+    start: str,
+    end: str,
+    client: httpx.Client | None = None,
+    max_keys: int = 3,
+    chunk_years: int = 10,
+    retries: int = 3,
+    retry_wait: float = 5.0,
+) -> pd.DataFrame:
+    """Fetch in (key-group x decade) chunks - one big request gets its connection reset."""
     client = client or httpx.Client(timeout=180)
-    resp = client.get(URL, params=params)
-    resp.raise_for_status()
-    return parse(resp.json())
+    result: pd.DataFrame | None = None
+    for i in range(0, len(dbkeys), max_keys):
+        group = dbkeys[i : i + max_keys]
+        for cs, ce in _date_chunks(start, end, chunk_years):
+            params = {
+                "timeseriesIds": ",".join(group),
+                "reportType": "timeseries",
+                "format": "json",
+                "startDate": cs.strftime("%Y%m%d"),
+                "endDate": ce.strftime("%Y%m%d"),
+                "datum": "NGVD29",
+            }
+            df = parse(_get(client, params, retries, retry_wait))
+            result = df if result is None else df.combine_first(result)
+    result = result if result is not None else parse({})
+    cols = [k for k in dbkeys if k in result.columns] + [c for c in result.columns if c not in dbkeys]
+    out = result.reindex(columns=cols).sort_index()
+    out.index.name = "date"
+    return out
 
 
 def splice(df: pd.DataFrame, keys: list[str]) -> pd.Series:
