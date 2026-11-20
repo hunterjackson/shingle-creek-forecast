@@ -58,3 +58,23 @@ Running log of facts discovered while building the SHIF1 forecast. Newest at bot
   for the hybrid, but expect the ML corrector to do a lot of work. Lumped input here was a
   basin-frac-weighted mean — for the real model, GR4J's input should be built from the
   selected cells (decision pending, user objected to blind averaging).
+
+## 2026-11-20 — DBHYDRO lakes + Campbell/Toho relation
+- Fetched 8 named series 1979+ (kiss_stage only 2009+, s65_q 1996+). Toho stage 48.5–56.8,
+  mean 53.7 ft NGVD29. Chunked requests needed (one big request → connection reset).
+- **Below ~200 cfs Campbell stage ≈ Lake Toho stage**: median (Campbell − Toho) = −0.02..0.15 ft,
+  corr 0.97–0.99 in every Q bin ≤ 200 cfs. Head rises with Q: median 0.6 ft @200–400 cfs,
+  1.6 @400–800, 3.2 @800–1600, 5.7 ft >1600 cfs. ⇒ Campbell gauge datum is effectively
+  NGVD29 and low water at Campbell *is* the (managed) Toho level.
+- Ratings fit ≤2015, tested 2016–2026 (stage from observed Q + Toho):
+  | rating | test MAE | RMSE | MAE ≥59 ft (n=32) | MAE low decile |
+  |---|---|---|---|---|
+  | free h0+aQ^b | 0.627 | 0.741 | 0.749 | – |
+  | backwater toho+cQ^d | 0.263 | 0.434 | 1.512 | – |
+  | **combined smooth-max** | **0.136** | **0.221** | **0.517** | **0.049** |
+  Combined params c=3.04e-5 d=1.48 h0=47.68 a=0.421 b=0.457 k=1.02. Overpredicts the largest
+  crests (Irma 61.85 → 63.1, Ian 63.82 → 65.4; Milton 60.56 → 60.57 exact) — floodplain
+  flattening and/or estimated peak Q.
+- **Modeling implication:** stage(t+h) = Rating(Q(t+h), Toho(t+h)). Forecast Q (rainfall-runoff:
+  GR4J/ML) and Toho (managed lake: regulation schedule, S-61/S-59 flows, inflow) separately and
+  combine through the rating → physically structured, extrapolates to floods via Q.

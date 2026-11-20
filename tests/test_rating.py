@@ -56,3 +56,30 @@ def test_rating_round_trips_through_dict():
     r2 = rating.from_dict(r.to_dict())
 
     assert r2 == r
+
+
+def test_combined_rating_follows_lake_at_low_flow_and_channel_at_high_flow(rng):
+    n = 4000
+    q = np.exp(rng.uniform(np.log(5), np.log(3500), n))
+    lake = rng.uniform(51.5, 56.0, n)
+    lake_ctrl = lake + 0.001 * q
+    chan_ctrl = 50.0 + 0.3 * q**0.45
+    stage = np.maximum(lake_ctrl, chan_ctrl) + rng.normal(0, 0.03, n)
+
+    r = rating.fit_combined(q, stage, lake)
+
+    # low flow: tracks the lake one-for-one
+    lo = r.predict_stage(np.array([20.0, 20.0]), lake=np.array([52.0, 55.0]))
+    assert lo[1] - lo[0] == pytest.approx(3.0, abs=0.15)
+    # high flow, low lake: channel control
+    hi = r.predict_stage(np.array([3000.0]), lake=np.array([52.0]))[0]
+    assert hi == pytest.approx(50.0 + 0.3 * 3000**0.45, abs=0.3)
+    # inverse is consistent
+    s = r.predict_stage(np.array([800.0]), lake=np.array([54.0]))
+    assert r.predict_flow(s, lake=np.array([54.0]))[0] == pytest.approx(800.0, rel=0.05)
+
+
+def test_combined_rating_round_trip_dict():
+    r = rating.CombinedRating(c=0.001, d=1.0, h0=50.0, a=0.3, b=0.45, k=8.0)
+
+    assert rating.from_dict(r.to_dict()) == r
