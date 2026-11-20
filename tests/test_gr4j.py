@@ -98,3 +98,15 @@ def test_calibrate_recovers_synthetic_flows():
     sim = gr4j.run(P, E, fit.params)["q"][365:]
     assert gr4j.nse(sim, q_obs[365:]) > 0.98
     assert fit.score > 0.98
+
+
+def test_unit_conversions_preserve_pandas_index():
+    import pandas as pd
+
+    s = pd.Series([100.0, 200.0], index=pd.date_range("2020-01-01", periods=2))
+
+    out = gr4j.cfs_to_mm_day(s, 466.2)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(s.index)
+    assert isinstance(gr4j.mm_day_to_cfs(out, 466.2), pd.Series)
