@@ -44,3 +44,17 @@ Running log of facts discovered while building the SHIF1 forecast. Newest at bot
   ⇒ stage is controlled by Lake Toho backwater at low/moderate flow. Rating must be
   stage = f(Q, lake). rating.py has FreeRating (h0 + a·Q^b) and BackwaterRating
   (lake + c·Q^d); fit on real data once DBHYDRO lake stage is available.
+
+## 2026-11-20 — exploratory GR4J on real flows (basin-frac-weighted gridMET, exploratory only)
+- Water balance: P 3.69, ET0 4.30, Q 1.09 mm/d (area 466.2 km²) → runoff ratio 0.29.
+- Calibrated 1979–2015, validated 2016–2019 (flows, mm/d):
+  | objective | x1 | x2 | x3 | x4 | train | val NSE | val KGE |
+  |---|---|---|---|---|---|---|---|
+  | nse | 14 | −10 (bound) | 658 | 3.3 | 0.64 | 0.79 | 0.87 |
+  | nse_sqrt | 14 | −10 (bound) | 423 | 3.2 | 0.69 | 0.65 | 0.75 |
+  | kge | 36 | −0.66 | 469 | 3.2 | 0.80 (KGE) | 0.61 | 0.67 |
+- x1 collapses to ~14–36 mm and x2 hits its bound → GR4J structure is a poor fit for this
+  urbanized (Orlando, fast runoff) + wetland/high-water-table basin. Usable as a backbone
+  for the hybrid, but expect the ML corrector to do a lot of work. Lumped input here was a
+  basin-frac-weighted mean — for the real model, GR4J's input should be built from the
+  selected cells (decision pending, user objected to blind averaging).
