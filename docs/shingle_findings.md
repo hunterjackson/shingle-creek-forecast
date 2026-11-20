@@ -140,3 +140,13 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
   response (not just a labelling artifact).
 - **MRMS has real spatial structure:** in-basin pixel pairwise daily corr median .66 (min .38) vs
   gridMET .96 → per-cell relevance analysis is meaningful with radar.
+
+## 2026-11-20 — archived rain forecasts by lead time
+- Open-Meteo Previous Runs API (precipitation_previous_dayN) has lead-dependent forecasts only
+  from ~2024 (best_match; gfs/ecmwf/nbm/icon also null for 2022–2023). Historical Forecast API
+  is stitched short-lead only.
+- Milton window 2024-10-05..09 at 28.3,-81.45: lead1 141 mm, lead3 111, lead5 47, lead7 24
+  (MRMS basin mean on 10-09 alone ≈140 mm) → skill collapses beyond ~3 days.
+- Plan: (1) score finalists with real lead-k forecasts 2024-01→now (test period, incl. Milton);
+  (2) fit a lead-dependent forecast-error model from 2024+ and use it to degrade observed rain
+  in earlier periods (and possibly in training, so models learn appropriate trust in rain).
