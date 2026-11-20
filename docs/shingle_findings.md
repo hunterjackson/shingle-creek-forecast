@@ -115,3 +115,17 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
   flood days in val — essentially Irma 2017; rating over-predicts the biggest crests).
 - Caveat: future rain is *observed* (perfect forecast). Real skill at h≥3 will be lower;
   rain-realism test pending.
+
+## 2026-11-20 — adding GR4J (lumped, basin_frac-weighted gridMET; calibrated ≤2015, train NSE .64)
+| MAE ft (val 16–19) | h1 | h3 | h7 | ≥59 h7 | low h7 | Irma h3 peak err / timing |
+|---|---|---|---|---|---|---|
+| ARX lgbm | .088 | .219 | .336 | 2.10 | .191 | −0.73 / +2 d |
+| ARX lgbm + gr4j feats | .086 | .190 | .284 | 1.80 | .172 | −0.92 / +2 d |
+| hybrid lgbm | .088 | .209 | .326 | 2.87 | .101 | −0.71 / +2 d |
+| **hybrid lgbm + gr4j feats** | .085 | .180 | **.258** | **1.03** | .108 | −0.49 / +3 d |
+| **hybrid lgbm, gr4j offset** | **.084** | **.174** | .263 | 1.55 | .109 | +0.98 / −1 d |
+| hybrid ridge, gr4j offset | .099 | .200 | .282 | 3.16 | .106 | −0.50 / +1 d |
+- GR4J states/flow cut flood error at h7 from 2.9 → 1.0 ft. Offset version extrapolates
+  (overshoots Irma peak +1 ft, partly the rating's known crest over-prediction) and peaks a day
+  EARLY → consistent with a gridMET day-labelling shift; check with MRMS LST days.
+- Still with *perfect* future rain.
