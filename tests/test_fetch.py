@@ -81,3 +81,22 @@ def test_dbhydro_requested_in_one_call_with_all_keys(tmp_path, fake_sources):
     fetch.fetch_history(tmp_path, today="2020-01-10", start="2020-01-01")
 
     assert fake_sources["dbhydro"] == [tuple(dbhydro.all_dbkeys())]
+
+
+def test_fetch_nwm_retro_writes_parquet_once(tmp_path, monkeypatch):
+    from home_display.shingle.sources import nwm_retro
+
+    calls = []
+
+    def fake_read(feature_id, start, end, store=None, min_hours=1):
+        calls.append((feature_id, start, end))
+        return pd.Series([1.0, 2.0], index=pd.date_range(start, periods=2, name="date"), name="nwm_retro_cfs")
+
+    monkeypatch.setattr(nwm_retro, "read_reach_daily", fake_read)
+
+    fetch.fetch_nwm_retro(tmp_path, start="1979-02-02", end="2023-01-31")
+    fetch.fetch_nwm_retro(tmp_path, start="1979-02-02", end="2023-01-31")
+
+    assert calls == [(int(config.NWM_REACH), "1979-02-02", "2023-01-31")]
+    df = pd.read_parquet(tmp_path / "nwm_retro.parquet")
+    assert list(df.columns) == ["nwm_retro_cfs"]

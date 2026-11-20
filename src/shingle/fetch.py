@@ -60,3 +60,17 @@ def load_history(data_dir: Path) -> dict:
         "lakes": dbhydro.named(pd.read_parquet(data_dir / "dbhydro.parquet")),
         "basin": nldi.parse_basin(json.loads((data_dir / "basin.geojson").read_text())),
     }
+
+
+def fetch_nwm_retro(data_dir: Path, start: str = "1979-02-02", end: str = "2023-01-31", refresh: bool = False) -> pd.DataFrame:
+    """One-off pull of the NWM v3 retrospective daily flow for our reach (~3.5 GB of chunk reads)."""
+    from home_display.shingle.sources import nwm_retro
+
+    path = Path(data_dir) / "nwm_retro.parquet"
+    if path.exists() and not refresh:
+        return pd.read_parquet(path)
+    s = nwm_retro.read_reach_daily(int(config.NWM_REACH), start, end, min_hours=24)
+    df = s.to_frame()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(path)
+    return df
