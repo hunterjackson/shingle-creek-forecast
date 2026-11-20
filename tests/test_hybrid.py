@@ -70,3 +70,37 @@ def test_hybrid_exposes_component_forecasts(data):
     comp = m.components(data, idx[2000:2010])
 
     assert list(comp.columns) == ["h1_q", "h1_toho", "h1_stage"]
+
+
+def test_residual_carryforward_corrects_persistent_rating_offset(data):
+    """Real ratings drift (vegetation, channel change): add an AR(1) offset to stage.
+
+    The carry-forward should recover most of the damage, i.e. land close to the
+    error achieved on drift-free data (whose floor is the flow-forecast error).
+    """
+    rng = np.random.default_rng(1)
+    n = len(data["stage"])
+    off = np.zeros(n)
+    for t in range(1, n):
+        off[t] = 0.98 * off[t - 1] + rng.normal(0, 0.03)
+    drift = dict(data)
+    drift["stage"] = data["stage"] + off
+    idx = data["stage"].index
+    sp = evaluate.time_split(idx, "2005-12-31", "2006-12-31", gap_days=7)
+    test = sp["test"][:-7]
+
+    def mae(d, carry):
+        m = make((1,))
+        m.carry_residual = carry
+        m.fit(d, sp["train"])
+        y = base.targets(d["stage"], (1,)).loc[test, "h1"]
+        return evaluate.point_metrics(y, m.predict(d, test)["h1_p50"])["mae"], m
+
+    floor, m_clean = mae(data, True)
+    plain, _ = mae(drift, False)
+    corrected, m = mae(drift, True)
+
+    assert corrected < plain
+    assert (corrected - floor) < 0.3 * (plain - floor)  # recovers >70% of the drift damage
+    assert 0.8 < m.phi[1] <= 1.0
+    assert abs(m_clean.phi[1]) < 0.2  # no drift -> (almost) no carry
