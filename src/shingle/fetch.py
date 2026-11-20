@@ -9,7 +9,7 @@ import pandas as pd
 
 from home_display.shingle import basin as basin_mod
 from home_display.shingle import cache, config
-from home_display.shingle.sources import gridmet, nldi, usgs
+from home_display.shingle.sources import dbhydro, gridmet, nldi, usgs
 
 
 def fetch_history(data_dir: Path, today: str | None = None, start: str = config.HISTORY_START, refresh: bool = False) -> None:
@@ -33,6 +33,14 @@ def fetch_history(data_dir: Path, today: str | None = None, start: str = config.
             refresh=refresh,
         )
 
+    cache.update_daily(
+        data_dir / "dbhydro.parquet",
+        lambda s, e: dbhydro.fetch(dbhydro.all_dbkeys(), s, e),
+        default_start=start,
+        today=today,
+        refresh=refresh,
+    )
+
     geojson = cache.cached_json(
         data_dir / "basin.geojson", lambda: nldi.fetch_basin_geojson(config.SITE), refresh=refresh
     )
@@ -49,5 +57,6 @@ def load_history(data_dir: Path) -> dict:
         "pr": pd.read_parquet(data_dir / "gridmet_pr.parquet"),
         "pet": pd.read_parquet(data_dir / "gridmet_pet.parquet"),
         "cells": pd.read_parquet(data_dir / "cells.parquet"),
+        "lakes": dbhydro.named(pd.read_parquet(data_dir / "dbhydro.parquet")),
         "basin": nldi.parse_basin(json.loads((data_dir / "basin.geojson").read_text())),
     }
