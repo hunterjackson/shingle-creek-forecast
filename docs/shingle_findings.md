@@ -78,3 +78,21 @@ Running log of facts discovered while building the SHIF1 forecast. Newest at bot
 - **Modeling implication:** stage(t+h) = Rating(Q(t+h), Toho(t+h)). Forecast Q (rainfall-runoff:
   GR4J/ML) and Toho (managed lake: regulation schedule, S-61/S-59 flows, inflow) separately and
   combine through the rating → physically structured, extrapolates to floods via Q.
+
+## 2026-11-20 — NWM v3 retrospective vs observed (reach 21476600)
+- Pulled 1979-02-02..2023-01-30 daily (local-day mean, ≥24 h) in 41 s → data/nwm_retro.parquet.
+- Flow skill vs USGS Campbell: NSE 0.29 / KGE 0.45 (1979–2015), 0.11 / 0.34 (2016–19),
+  −0.25 / 0.23 (2020–23). **Bias +43…48 %**; corr 0.76–0.83. Peaks ~2× too high
+  (2004 3310 vs 1980; 2017 5606 vs 2690; 2022 9819 vs 3750 cfs).
+- NWM flow → stage through our CombinedRating with *observed* Toho, 2016–2023: MAE 0.62 ft,
+  **MAE ≥59 ft 3.79 ft** (observed flow through same rating: 0.15 ft).
+- ⇒ Raw NWM is a weak benchmark here; but its correlation makes a bias-corrected NWM flow a
+  plausible candidate *feature*. (Exploratory GR4J w/ gridMET already reached val NSE 0.79.)
+
+## 2026-11-20 — MRMS radar plan
+- IEM archive mtarchive.geol.iastate.edu/YYYY/MM/DD/mrms/ncep/<product>/. Gauge-corrected
+  daily products: GaugeCorr_QPE_24H (~2018-10 → 2020-10, 4.7 MB/file), MultiSensor_QPE_24H_Pass2
+  (2020-10 → now, 3.1 MB). Before ~2018-10 only GaugeCorr_QPE_01H (0.8 MB × 24/day ≈ 24 GB
+  for 2015–18) or RadarOnly_QPE_24H — skipped for now.
+- Use the 24 h file stamped 05:00Z on D+1 = local-standard-time calendar day D (USGS dv uses
+  LST). GRIB2 read via cfgrib + eccodes + eccodeslib (bundled binary).
