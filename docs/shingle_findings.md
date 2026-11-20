@@ -167,3 +167,11 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
   Irma while actual errors were 1–5 ft (calm days dominate calibration). Need state-dependent
   intervals (condition on flow regime / predicted change / forecast-rain spread) before any
   dashboard use.
+
+## 2026-11-20 — MRMS download complete
+- 3065 days 2018-06-30 .. 2026-11-19, 1320 px (44×30 @0.01°), **0 missing days**, 29 min, ~10 GB
+  transferred → 91 MB of monthly parquet.
+- Basin-mean annual totals 1190–1618 mm (2018 partial). Ian: 09-28 137 mm (87–195 px range),
+  09-29 113 mm (37–184); Milton 10-09 140 mm (42–242).
+- Split problem: radar starts mid-2018, so under the current split (val 2016–19, test 2020+) only
+  ~1.5 radar years are available for selection/training. Split decision pending with user.
