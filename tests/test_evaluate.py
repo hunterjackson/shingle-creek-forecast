@@ -92,3 +92,37 @@ def test_metrics_align_series_on_index():
     p = pd.Series([2.0, 3.0], index=idx("2020-01-02", 2))  # perfect where overlapping
 
     assert evaluate.point_metrics(y, p)["mae"] == 0.0
+
+
+class _StubModel:
+    """p50 = 0; calibrate stores the residual offsets of the calibration rows."""
+
+    horizons = (1,)
+
+    def __init__(self):
+        self.calibrated_on = []
+
+    def calibrate(self, data, cal_index):
+        self.calibrated_on.append(cal_index)
+        r = data["stage"].shift(-1).loc[cal_index]
+        self.lo, self.hi = evaluate.conformal_offsets(r, 0.8)
+        return self
+
+    def predict(self, data, index):
+        return pd.DataFrame({"h1_p10": self.lo, "h1_p50": 0.0, "h1_p90": self.hi}, index=index)
+
+
+def test_cross_conformal_predicts_each_year_with_bands_from_other_years():
+    rng = np.random.default_rng(0)
+    index = pd.date_range("2016-01-01", "2019-12-31", name="date")
+    data = {"stage": pd.Series(rng.normal(0, 1, len(index)), index=index)}
+    m = _StubModel()
+
+    fc = evaluate.cross_conformal_predict(m, data, index)
+
+    assert fc.index.equals(index)
+    assert len(m.calibrated_on) == 4
+    for cal in m.calibrated_on:
+        assert len(set(cal.year)) == 3  # one year held out each time
+    y = data["stage"].shift(-1).loc[index]
+    assert 0.75 < evaluate.coverage(y, fc["h1_p10"], fc["h1_p90"]) < 0.85

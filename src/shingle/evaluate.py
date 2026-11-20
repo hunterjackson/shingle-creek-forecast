@@ -106,3 +106,16 @@ def conformal_offsets(residuals: pd.Series, coverage: float = 0.8) -> tuple[floa
     r = pd.Series(residuals).dropna().to_numpy()
     a = (1 - coverage) / 2
     return float(np.quantile(r, a)), float(np.quantile(r, 1 - a))
+
+
+def cross_conformal_predict(model, data: dict, index: pd.DatetimeIndex) -> pd.DataFrame:
+    """Leave-one-year-out conformal: each year is predicted with intervals
+    calibrated on the remaining years of `index`, so reported coverage is honest."""
+    parts = []
+    years = sorted(set(index.year))
+    for yr in years:
+        held = index[index.year == yr]
+        cal = index[index.year != yr]
+        model.calibrate(data, cal)
+        parts.append(model.predict(data, held))
+    return pd.concat(parts).loc[index]

@@ -40,3 +40,12 @@ def test_persistence_p50_is_today_and_intervals_are_calibrated(stage):
     y = base.targets(stage, (1, 7)).loc[fc.index]
     inside = ((y["h1"] >= fc["h1_p10"]) & (y["h1"] <= fc["h1_p90"])).mean()
     assert 0.65 < inside < 0.95
+
+
+def test_persistence_calibrate_on_other_index_changes_offsets(stage):
+    m = baseline.Persistence(horizons=(1,)).fit({"stage": stage}, stage.index[:100])
+    before = m.offsets[1]
+
+    m.calibrate({"stage": stage * 3 - 108}, stage.index[100:300])  # 3x more volatile
+
+    assert m.offsets[1][1] > before[1]
