@@ -136,3 +136,18 @@ def test_lake_features_no_lookahead(lake_data):
 
     after = features.build(pert, names).iloc[t]
     pd.testing.assert_series_equal(before, after)
+
+
+def test_gr4j_features(data):
+    from home_display.shingle.models import gr4j
+
+    d = dict(data)
+    d["gr4j"] = pd.DataFrame(
+        {"q": np.linspace(10, 100, len(d["stage"])), "s": 50.0, "r": 20.0}, index=d["stage"].index
+    )
+    X = features.build(d, ["gr4j_logq", "gr4j_dH", "gr4j_s", "gr4j_r"], horizon=4)
+    t = 30
+
+    assert X["gr4j_logq"].iloc[t] == pytest.approx(np.log1p(d["gr4j"]["q"].iloc[t]))
+    assert X["gr4j_dH"].iloc[t] == pytest.approx(np.log1p(d["gr4j"]["q"].iloc[t + 4]) - np.log1p(d["gr4j"]["q"].iloc[t]))
+    assert X["gr4j_s"].iloc[t] == 50.0

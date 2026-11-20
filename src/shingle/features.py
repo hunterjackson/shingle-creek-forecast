@@ -10,6 +10,8 @@ Name grammar (matches analysis_run.candidate_features):
   log_q_d{k}           log1p(Q) change over k days
   toho, dtoho_{k}, toho_dev (toho - regulation target), etoho
   toho_target_dH       target(t+h) - target(t)  (schedule known in advance)
+  gr4j_logq, gr4j_s, gr4j_r  GR4J simulated log1p flow / store levels at t
+  gr4j_dH              GR4J simulated log-flow change t -> t+h (driven by future rain)
   log_s61, log_s59     log1p structure outflows (S-61 Toho, S-59 East Toho)
 
 `data` keys: stage, q, q_up (Series); pr, pet (wide per-cell frames);
@@ -52,6 +54,15 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
             raise ValueError(f"{name} needs a horizon")
         later = schedule.toho_target(index + pd.Timedelta(days=horizon))
         return pd.Series(later - schedule.toho_target(index), index=index)
+    if name == "gr4j_logq":
+        return np.log1p(data["gr4j"]["q"])
+    if name == "gr4j_dH":
+        if horizon is None:
+            raise ValueError(f"{name} needs a horizon")
+        lq = np.log1p(data["gr4j"]["q"])
+        return lq.shift(-horizon) - lq
+    if name in ("gr4j_s", "gr4j_r"):
+        return data["gr4j"][name.split("_")[1]]
     if name == "log_s61":
         return np.log1p(data["s61_q"].clip(lower=0))
     if name == "log_s59":
