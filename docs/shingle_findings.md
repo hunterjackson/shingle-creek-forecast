@@ -150,3 +150,20 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
 - Plan: (1) score finalists with real lead-k forecasts 2024-01→now (test period, incl. Milton);
   (2) fit a lead-dependent forecast-error model from 2024+ and use it to degrade observed rain
   in earlier periods (and possibly in training, so models learn appropriate trust in rain).
+
+## 2026-11-20 — bracketing the GR4J hybrid: perfect vs NO future rain (val 2016–19)
+| | MAE h1/h3/h7 | ≥59 ft h1/h3/h7 | low h7 | POD≥59 h7 |
+|---|---|---|---|---|
+| persistence | .134/.334/.603 | .78/2.37/4.65 | .237 | .42 |
+| GR4J hybrid, perfect rain | .085/.180/.258 | .51/1.18/1.03 | .108 | .50 |
+| GR4J hybrid, NO future rain | .086/.242/.478 | .50/1.75/4.23 | .174 | .08 |
+- The impressive 3–7 day numbers come almost entirely from perfect future rain. With no rain
+  knowledge, 7-day flood error (4.2 ft) ≈ persistence; the 7-day forecasts for Irma stay flat at
+  ~54.6 ft. Real skill will sit between the brackets → must measure with 2024+ archived forecasts.
+- Robust regardless of rain: 1-day forecasts, low water (h7 .17 vs .24), the recession after a peak.
+- Irma rise, perfect rain: 7-day-ahead forecast for 09-11 = 60.5 (obs 60.96); 3-day-ahead for 09-13
+  dips to 58.1 (obs 62.28) — rise timing still imperfect even with perfect rain.
+- **Uncertainty bands are broken in floods:** constant conformal offsets give ±0.1–0.3 ft during
+  Irma while actual errors were 1–5 ft (calm days dominate calibration). Need state-dependent
+  intervals (condition on flow regime / predicted change / forecast-rain spread) before any
+  dashboard use.
