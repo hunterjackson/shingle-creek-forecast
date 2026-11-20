@@ -37,3 +37,10 @@ Running log of facts discovered while building the SHIF1 forecast. Newest at bot
   this is a smoothing artifact of the product (daily timing from ~12 km NLDAS), not the climate.
 - Implication: per-cell analysis needs radar-based rainfall (SFWMD NEXRAD ~2 km, or NOAA
   Stage IV 4 km 2002+ / MRMS 1 km). Decision pending with user.
+
+## 2026-11-20 — stage–discharge relation at Campbell (2010+)
+- Not single-valued below ~400 cfs: Q 50–100 cfs → stage 52.06–55.17 ft (IQR 53.1–54.5);
+  Q 100–200 → 52.2–55.4. Tightens only above ~400 cfs (800–1600 cfs → 56.6–60.8).
+  ⇒ stage is controlled by Lake Toho backwater at low/moderate flow. Rating must be
+  stage = f(Q, lake). rating.py has FreeRating (h0 + a·Q^b) and BackwaterRating
+  (lake + c·Q^d); fit on real data once DBHYDRO lake stage is available.
