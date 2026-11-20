@@ -129,3 +129,14 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
   (overshoots Irma peak +1 ft, partly the rating's known crest over-prediction) and peaks a day
   EARLY → consistent with a gridMET day-labelling shift; check with MRMS LST days.
 - Still with *perfect* future rain.
+
+## 2026-11-20 — MRMS vs gridMET (first 794 days, 2018-07 .. 2020-08, basin mean)
+- Totals: MRMS ~1406 mm/yr vs gridMET 1568 (in-basin cells >50 %).
+- Day alignment: corr(MRMS[t], gridMET[t+k]) = .156/.391/**.851**/.159/.142 for k=−2..2.
+  MRMS LST-day rain leaks into gridMET day t−1 (r .39 vs .16 the other way) → gridMET day ≈
+  07–07 local, overnight rain labelled a day early. Explains the GR4J-offset model peaking
+  ~1 day early.
+- Stage response: corr(rain[t−lag], Δstage[t]) MRMS lag0 .28, **lag1 .60**, lag2 .10 → real ~1-day
+  response (not just a labelling artifact).
+- **MRMS has real spatial structure:** in-basin pixel pairwise daily corr median .66 (min .38) vs
+  gridMET .96 → per-cell relevance analysis is meaningful with radar.
