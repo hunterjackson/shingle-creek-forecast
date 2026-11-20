@@ -7,7 +7,13 @@ Name grammar (matches analysis_run.candidate_features):
   pr_nextH__{cell}     same, with h = the `horizon` argument
   wb_past{w}__{cell}   sum of (rain - ET0) over t-w+1..t
 
-`data` keys: stage, q, q_up (Series); pr, pet (wide per-cell frames).
+  log_q_d{k}           log1p(Q) change over k days
+  toho, dtoho_{k}, toho_dev (toho - regulation target), etoho
+  toho_target_dH       target(t+h) - target(t)  (schedule known in advance)
+  log_s61, log_s59     log1p structure outflows (S-61 Toho, S-59 East Toho)
+
+`data` keys: stage, q, q_up (Series); pr, pet (wide per-cell frames);
+toho, s61_q, s59_q, etoho (Series) when lake features are used.
 """
 
 from __future__ import annotations
@@ -17,10 +23,12 @@ import re
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import analysis
+from home_display.shingle import analysis, schedule
 
 _CELL = re.compile(r"^(pr_past|pr_next|wb_past)(\d+|H)__(.+)$")
 _DSTAGE = re.compile(r"^dstage_(\d+)$")
+_DTOHO = re.compile(r"^dtoho_(\d+)$")
+_LOGQ_D = re.compile(r"^log_q_d(\d+)$")
 
 
 def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) -> pd.Series:
@@ -30,6 +38,26 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
         return data["stage"].diff(int(m.group(1)))
     if name == "log_q":
         return np.log1p(data["q"])
+    if m := _LOGQ_D.match(name):
+        return np.log1p(data["q"]).diff(int(m.group(1)))
+    if name == "toho":
+        return data["toho"]
+    if m := _DTOHO.match(name):
+        return data["toho"].diff(int(m.group(1)))
+    if name == "toho_dev":
+        return data["toho"] - schedule.toho_target_series(index)
+    if name == "toho_target_dH":
+        # the regulation schedule is published in advance -> not lookahead
+        if horizon is None:
+            raise ValueError(f"{name} needs a horizon")
+        later = schedule.toho_target(index + pd.Timedelta(days=horizon))
+        return pd.Series(later - schedule.toho_target(index), index=index)
+    if name == "log_s61":
+        return np.log1p(data["s61_q"].clip(lower=0))
+    if name == "log_s59":
+        return np.log1p(data["s59_q"].clip(lower=0))
+    if name == "etoho":
+        return data["etoho"]
     if name == "log_q_up":
         return np.log1p(data["q_up"])
     if name in ("doy_sin", "doy_cos"):

@@ -93,3 +93,46 @@ def test_future_rain_feature_uses_only_rain_not_future_stage(data):
 
     after = features.build(perturbed, [name]).iloc[t]
     pd.testing.assert_series_equal(before, after)
+
+
+@pytest.fixture
+def lake_data(data):
+    idx = data["stage"].index
+    rng = np.random.default_rng(9)
+    d = dict(data)
+    d["toho"] = pd.Series(53.0 + np.cumsum(rng.normal(0, 0.02, len(idx))), index=idx)
+    d["s61_q"] = pd.Series(rng.uniform(0, 1000, len(idx)), index=idx)
+    d["s59_q"] = pd.Series(rng.uniform(0, 500, len(idx)), index=idx)
+    d["etoho"] = pd.Series(56.0, index=idx)
+    return d
+
+
+def test_lake_features(lake_data):
+    from home_display.shingle import schedule
+
+    names = ["toho", "dtoho_3", "toho_dev", "toho_target_dH", "log_s61", "log_s59", "etoho", "log_q_d1"]
+    X = features.build(lake_data, names, horizon=5)
+    t = 60
+    idx = lake_data["stage"].index
+    target = schedule.toho_target_series(idx)
+
+    assert X["toho"].iloc[t] == lake_data["toho"].iloc[t]
+    assert X["dtoho_3"].iloc[t] == pytest.approx(lake_data["toho"].iloc[t] - lake_data["toho"].iloc[t - 3])
+    assert X["toho_dev"].iloc[t] == pytest.approx(lake_data["toho"].iloc[t] - target.iloc[t])
+    # schedule is known in advance, so target(t+h) - target(t) is a legitimate "future" feature
+    assert X["toho_target_dH"].iloc[t] == pytest.approx(target.iloc[t + 5] - target.iloc[t])
+    assert X["log_s61"].iloc[t] == pytest.approx(np.log1p(lake_data["s61_q"].iloc[t]))
+    assert X["log_q_d1"].iloc[t] == pytest.approx(np.log1p(lake_data["q"].iloc[t]) - np.log1p(lake_data["q"].iloc[t - 1]))
+
+
+def test_lake_features_no_lookahead(lake_data):
+    names = ["toho", "dtoho_3", "toho_dev", "log_s61", "log_s59", "etoho", "log_q_d1"]
+    t = 120
+    before = features.build(lake_data, names).iloc[t]
+    pert = {k: v.copy() for k, v in lake_data.items()}
+    after_t = pert["stage"].index > pert["stage"].index[t]
+    for k in ("toho", "s61_q", "s59_q", "etoho", "q"):
+        pert[k][after_t] += 50.0
+
+    after = features.build(pert, names).iloc[t]
+    pd.testing.assert_series_equal(before, after)
