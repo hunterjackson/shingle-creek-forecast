@@ -74,3 +74,37 @@ def fetch_nwm_retro(data_dir: Path, start: str = "1979-02-02", end: str = "2023-
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path)
     return df
+
+
+def fetch_mrms_history(data_dir: Path, start: str | None = None, today: str | None = None, workers: int = 8) -> None:
+    """Download MRMS daily QPE month by month into data/mrms/YYYY-MM.parquet (resumable).
+
+    A month file is considered final once its last day is >= 5 days before
+    `today`; otherwise it is re-fetched (latest days get revised / filled in).
+    """
+    from home_display.shingle.sources import mrms
+
+    out = Path(data_dir) / "mrms"
+    out.mkdir(parents=True, exist_ok=True)
+    start_ts = pd.Timestamp(start) if start else mrms.START
+    end_ts = pd.Timestamp(today) if today else pd.Timestamp.today().normalize() - pd.Timedelta(days=1)
+
+    for month in pd.period_range(start_ts, end_ts, freq="M"):
+        m_start = max(start_ts, month.start_time)
+        m_end = min(end_ts, month.end_time.normalize())
+        path = out / f"{month}.parquet"
+        final = month.end_time.normalize() <= end_ts - pd.Timedelta(days=5)
+        if path.exists() and final:
+            existing = pd.read_parquet(path)
+            if existing.index.max() >= month.end_time.normalize():
+                continue
+        df = mrms.fetch(m_start.strftime("%Y-%m-%d"), m_end.strftime("%Y-%m-%d"), config.BBOX, workers=workers)
+        df.to_parquet(path)
+
+
+def load_mrms(data_dir: Path) -> pd.DataFrame:
+    parts = sorted((Path(data_dir) / "mrms").glob("*.parquet"))
+    df = pd.concat([pd.read_parquet(p) for p in parts]).sort_index()
+    df = df[~df.index.duplicated(keep="last")]
+    df.index.name = "date"
+    return df

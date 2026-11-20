@@ -100,3 +100,30 @@ def test_fetch_nwm_retro_writes_parquet_once(tmp_path, monkeypatch):
     assert calls == [(int(config.NWM_REACH), "1979-02-02", "2023-01-31")]
     df = pd.read_parquet(tmp_path / "nwm_retro.parquet")
     assert list(df.columns) == ["nwm_retro_cfs"]
+
+
+def test_fetch_mrms_history_checkpoints_by_month_and_skips_complete_months(tmp_path, monkeypatch):
+    from home_display.shingle.sources import mrms
+
+    calls = []
+
+    def fake_fetch(start, end, bbox, workers=8):
+        calls.append((start, end))
+        idx = pd.date_range(start, end, name="date")
+        return pd.DataFrame({"28.500_-81.500": 1.0}, index=idx)
+
+    monkeypatch.setattr(mrms, "fetch", fake_fetch)
+
+    fetch.fetch_mrms_history(tmp_path, start="2024-01-15", today="2024-03-10")
+    assert calls == [("2024-01-15", "2024-01-31"), ("2024-02-01", "2024-02-29"), ("2024-03-01", "2024-03-10")]
+    assert sorted(p.name for p in (tmp_path / "mrms").iterdir()) == ["2024-01.parquet", "2024-02.parquet", "2024-03.parquet"]
+
+    calls.clear()
+    fetch.fetch_mrms_history(tmp_path, start="2024-01-15", today="2024-03-20")
+    # Jan, Feb complete -> skipped; March (current, incomplete) refetched
+    assert calls == [("2024-03-01", "2024-03-20")]
+
+    df = fetch.load_mrms(tmp_path)
+    assert df.index.min() == pd.Timestamp("2024-01-15")
+    assert df.index.max() == pd.Timestamp("2024-03-20")
+    assert df.index.is_unique
