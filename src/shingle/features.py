@@ -33,7 +33,7 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
     if name == "log_q_up":
         return np.log1p(data["q_up"])
     if name in ("doy_sin", "doy_cos"):
-        angle = 2 * np.pi * index.dayofyear / 365.25
+        angle = 2 * np.pi * index.day_of_year / 365.25
         return pd.Series(np.sin(angle) if name == "doy_sin" else np.cos(angle), index=index)
     if m := _CELL.match(name):
         kind, w, cell = m.groups()
