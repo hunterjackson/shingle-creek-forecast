@@ -75,3 +75,26 @@ def test_cfs_mm_conversion_round_trip():
 
     assert mm[0] == pytest.approx(100 * 0.0283168466 * 86400 / (area_km2 * 1e6) * 1000)
     assert gr4j.mm_day_to_cfs(mm, area_km2)[0] == pytest.approx(100.0)
+
+
+def test_nse_and_kge_metrics():
+    obs = np.array([1.0, 2.0, 3.0, 4.0])
+
+    assert gr4j.nse(obs, obs) == pytest.approx(1.0)
+    assert gr4j.nse(np.full(4, obs.mean()), obs) == pytest.approx(0.0)
+    assert gr4j.kge(obs, obs) == pytest.approx(1.0)
+
+
+def test_calibrate_recovers_synthetic_flows():
+    rng = np.random.default_rng(11)
+    n = 3 * 365
+    P = rng.gamma(0.35, 12, n)
+    E = 3.5 + 1.5 * np.sin(np.arange(n) * 2 * np.pi / 365)
+    true = gr4j.Params(x1=420.0, x2=-0.8, x3=110.0, x4=2.2)
+    q_obs = gr4j.run(P, E, true)["q"]
+
+    fit = gr4j.calibrate(P, E, q_obs, warmup=365, seed=0)
+
+    sim = gr4j.run(P, E, fit.params)["q"][365:]
+    assert gr4j.nse(sim, q_obs[365:]) > 0.98
+    assert fit.score > 0.98
