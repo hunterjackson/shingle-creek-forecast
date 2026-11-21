@@ -126,3 +126,42 @@ def test_cross_conformal_predicts_each_year_with_bands_from_other_years():
         assert len(set(cal.year)) == 3  # one year held out each time
     y = data["stage"].shift(-1).loc[index]
     assert 0.75 < evaluate.coverage(y, fc["h1_p10"], fc["h1_p90"]) < 0.85
+
+
+def test_binned_conformal_widens_with_scale():
+    rng = np.random.default_rng(3)
+    n = 20000
+    scale = rng.exponential(1.0, n)
+    resid = rng.normal(0, 0.05 + 0.5 * scale)  # error grows with predicted change
+
+    bc = evaluate.BinnedConformal.fit(pd.Series(resid), pd.Series(scale), n_bins=5, coverage=0.8)
+    lo, hi = bc.offsets(np.array([0.01, 3.0]))
+
+    assert hi[1] - lo[1] > 5 * (hi[0] - lo[0])
+    # calibrated within each regime on fresh data
+    scale2 = rng.exponential(1.0, n)
+    resid2 = rng.normal(0, 0.05 + 0.5 * scale2)
+    l2, h2 = bc.offsets(scale2)
+    big = scale2 > np.quantile(scale2, 0.8)
+    assert 0.75 < ((resid2 >= l2) & (resid2 <= h2))[big].mean() < 0.85
+    assert 0.75 < ((resid2 >= l2) & (resid2 <= h2)).mean() < 0.85
+
+
+def test_binned_conformal_merges_sparse_bins_and_handles_constant_scale():
+    resid = pd.Series(np.random.default_rng(0).normal(0, 1, 500))
+
+    bc = evaluate.BinnedConformal.fit(resid, pd.Series(np.zeros(500)), n_bins=5, coverage=0.8)
+    lo, hi = bc.offsets(np.array([0.0, 10.0]))
+
+    assert lo[0] == lo[1] and hi[0] == hi[1]
+
+
+def test_binned_conformal_band_always_contains_point_forecast():
+    rng = np.random.default_rng(5)
+    scale = rng.exponential(1.0, 5000)
+    resid = rng.normal(0, 0.1, 5000) + np.where(scale > 1.0, -1.0, 0.0)  # top bins biased high
+
+    bc = evaluate.BinnedConformal.fit(pd.Series(resid), pd.Series(scale), n_bins=5)
+    lo, hi = bc.offsets(np.linspace(0, 5, 50))
+
+    assert (lo <= 0).all() and (hi >= 0).all()

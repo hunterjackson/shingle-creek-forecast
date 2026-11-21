@@ -72,3 +72,11 @@ def test_arx_per_horizon_feature_lists(data):
 
     assert m.feature_names(1) == feats[1]
     assert m.feature_names(3) == feats[3]
+
+
+def test_arx_bands_are_state_dependent(data):
+    idx = data["stage"].index
+    m = arx.ARX(features=FEATS, horizons=(3,)).fit(data, idx[:2000])
+    fc = m.predict(data, idx[2000:2900])
+    width = (fc["h3_p90"] - fc["h3_p10"]).round(6)
+    assert width.nunique() > 1

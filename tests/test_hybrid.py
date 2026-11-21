@@ -104,3 +104,17 @@ def test_residual_carryforward_corrects_persistent_rating_offset(data):
     assert (corrected - floor) < 0.3 * (plain - floor)  # recovers >70% of the drift damage
     assert 0.8 < m.phi[1] <= 1.0
     assert abs(m_clean.phi[1]) < 0.2  # no drift -> (almost) no carry
+
+
+def test_bands_widen_when_a_big_change_is_predicted(data):
+    idx = data["stage"].index
+    sp = evaluate.time_split(idx, "2005-12-31", "2006-12-31", gap_days=7)
+    m = make((3,)).fit(data, sp["train"]).calibrate(data, sp["val"])
+
+    fc = m.predict(data, sp["test"][:-7])
+
+    width = fc["h3_p90"] - fc["h3_p10"]
+    change = (fc["h3_p50"] - data["stage"].loc[fc.index]).abs()
+    big = change > change.quantile(0.9)
+    small = change < change.quantile(0.5)
+    assert width[big].mean() > 1.5 * width[small].mean()

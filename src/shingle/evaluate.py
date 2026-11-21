@@ -119,3 +119,42 @@ def cross_conformal_predict(model, data: dict, index: pd.DatetimeIndex) -> pd.Da
         model.calibrate(data, cal)
         parts.append(model.predict(data, held))
     return pd.concat(parts).loc[index]
+
+
+class BinnedConformal:
+    """Split-conformal intervals conditioned on a scale variable (e.g. |predicted change|).
+
+    Calibration residuals are grouped into quantile bins of the scale; each bin
+    gets its own empirical (lo, hi) offsets, so a forecast of a big rise gets a
+    wide band while a calm day stays narrow. Bins with < min_count points are
+    merged into their neighbour.
+    """
+
+    def __init__(self, edges: np.ndarray, lo: np.ndarray, hi: np.ndarray):
+        self.edges, self.lo, self.hi = edges, lo, hi
+
+    @classmethod
+    def fit(cls, residuals: pd.Series, scale: pd.Series, n_bins: int = 5, coverage: float = 0.8, min_count: int = 60) -> "BinnedConformal":
+        df = pd.concat([pd.Series(np.asarray(residuals, float)), pd.Series(np.asarray(scale, float))], axis=1, keys=["r", "s"]).dropna()
+        qs = np.unique(np.quantile(df["s"], np.linspace(0, 1, n_bins + 1)[1:-1])) if len(df) else np.array([])
+        edges = list(qs)
+        # merge sparse bins
+        while edges:
+            labels = np.searchsorted(edges, df["s"].to_numpy(), side="right")
+            counts = np.bincount(labels, minlength=len(edges) + 1)
+            if counts.min() >= min_count:
+                break
+            worst = int(np.argmin(counts))
+            edges.pop(min(worst, len(edges) - 1))
+        edges = np.array(edges)
+        labels = np.searchsorted(edges, df["s"].to_numpy(), side="right")
+        a = (1 - coverage) / 2
+        lo = np.array([np.quantile(df["r"].to_numpy()[labels == b], a) for b in range(len(edges) + 1)])
+        hi = np.array([np.quantile(df["r"].to_numpy()[labels == b], 1 - a) for b in range(len(edges) + 1)])
+        # keep the point forecast inside its band (a biased bin otherwise yields p90 < p50)
+        return cls(edges, np.minimum(lo, 0.0), np.maximum(hi, 0.0))
+
+    def offsets(self, scale) -> tuple[np.ndarray, np.ndarray]:
+        s = np.nan_to_num(np.asarray(scale, float), nan=0.0)
+        b = np.searchsorted(self.edges, s, side="right")
+        return self.lo[b], self.hi[b]
