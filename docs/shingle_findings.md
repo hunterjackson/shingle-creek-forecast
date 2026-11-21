@@ -191,3 +191,20 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
   travel-time differences).
 - After the first 1–2 rain picks, greedy selections scatter (outside cells, sign flips) →
   overfitting with ~1200 rows × ~3000 candidates. Need stability selection.
+
+## 2026-11-20 — radar stability selection (40 block-bootstraps, 120-day blocks, target Δlog Q)
+- Per 2 km cell, nothing is stable (only h1 pr_past1 @28.33,−81.47 at 58 %); neighbouring cells
+  split the picks (h3: two adjacent cells 42.5 % each).
+- **Pooled by redundancy region (r≥0.85 on 3-day sums → 18 regions) it is stable & physical:**
+  | region | centre / in-basin / km to gauge | stable picks (pooled freq) |
+  |---|---|---|
+  | R12 | 28.367,−81.446 / 69 % / 12 km | pr_past1 h1 1.00; pr_next3 h3 .95; pr_past1 h3 .72; pr_next7 h7 1.00 |
+  | R13 | 28.272,−81.428 / 22 % / 5 km | pr_next1 h1 .90 |
+  | R18 | 28.468,−81.387 / 41 % / 23 km | pr_past3 h3 .85; pr_past1 h7 .62 |
+  | R17 | 28.442,−81.471 / 88 % / 20 km | pr_past30 h3 .45, h7 .38 |
+  | R3/R11 | west, outside basin | wb_past30/90 .25–.53 (suspect) |
+  Lower basin → immediate; mid-basin → days 1–7; upper basin → lagged 1–3 days; upper-basin
+  30-day wetness → antecedent control. Clusters at r≥0.9 (38) tell the same story.
+- Design: regional (cluster-mean) radar features, keep (kind, region) with pooled freq ≥ 0.5.
+  Radar only spans 2018-07+, so use it in a residual corrector on top of the long-record
+  (gridMET) hybrid rather than as the sole input.
