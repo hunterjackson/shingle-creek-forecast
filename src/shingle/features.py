@@ -12,6 +12,7 @@ Name grammar (matches analysis_run.candidate_features):
   toho_target_dH       target(t+h) - target(t)  (schedule known in advance)
   gr4j_logq, gr4j_s, gr4j_r  GR4J simulated log1p flow / store levels at t
   gr4j_dH              GR4J simulated log-flow change t -> t+h (driven by future rain)
+  rad_<rain feature>    any pr_/wb_ feature computed on data['radar'] (MRMS regions)
   log_s61, log_s59     log1p structure outflows (S-61 Toho, S-59 East Toho)
 
 `data` keys: stage, q, q_up (Series); pr, pet (wide per-cell frames);
@@ -34,6 +35,10 @@ _LOGQ_D = re.compile(r"^log_q_d(\d+)$")
 
 
 def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) -> pd.Series:
+    if name.startswith("rad_"):
+        # same grammar on the radar (MRMS region) frame
+        radar = dict(data, pr=data["radar"], pet=data.get("radar_pet", data["pet"]))
+        return _one(radar, name[4:], horizon, index)
     if name == "stage":
         return data["stage"]
     if m := _DSTAGE.match(name):

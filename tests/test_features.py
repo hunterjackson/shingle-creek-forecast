@@ -151,3 +151,17 @@ def test_gr4j_features(data):
     assert X["gr4j_logq"].iloc[t] == pytest.approx(np.log1p(d["gr4j"]["q"].iloc[t]))
     assert X["gr4j_dH"].iloc[t] == pytest.approx(np.log1p(d["gr4j"]["q"].iloc[t + 4]) - np.log1p(d["gr4j"]["q"].iloc[t]))
     assert X["gr4j_s"].iloc[t] == 50.0
+
+
+def test_rad_prefix_reads_radar_frame(data):
+    d = dict(data)
+    d["radar"] = data["pr"] * 2
+    d["radar_pet"] = data["pet"]
+
+    X = features.build(d, [f"rad_pr_past3__{CELL}", f"pr_past3__{CELL}", f"rad_wb_past30__{CELL}"])
+    t = 40
+
+    assert X[f"rad_pr_past3__{CELL}"].iloc[t] == pytest.approx(np.log1p(2 * data["pr"][CELL].iloc[t - 2 : t + 1].sum()))
+    assert X[f"pr_past3__{CELL}"].iloc[t] == pytest.approx(np.log1p(data["pr"][CELL].iloc[t - 2 : t + 1].sum()))
+    wb = (2 * data["pr"][CELL] - data["pet"][CELL]).iloc[t - 29 : t + 1].sum()
+    assert X[f"rad_wb_past30__{CELL}"].iloc[t] == pytest.approx(wb)
