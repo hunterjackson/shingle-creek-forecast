@@ -73,3 +73,26 @@ def test_selected_cells_json_schema(history, tmp_path):
     assert "28.0000_-81.0000" in data["cells"]
     assert data["features"]["3"][0]  # ordered feature list per horizon
     assert all(isinstance(f, str) for f in data["features"]["3"])
+
+
+def test_run_with_log_q_target(history):
+    h = dict(history)
+    g = h["gauge"].copy()
+    g["discharge_cfs"] = np.expm1((g["stage_ft"] - 50) * 1.5)
+    h["gauge"] = g
+
+    res = analysis_run.run(h, horizons=(3,), past_windows=(1, 3), train_end="2005-12-31", max_k=4, target="log_q")
+
+    assert res["target"] == "log_q"
+    rain_feats = [f for f in res["selection"][3]["feature"] if f.startswith("pr_")]
+    assert rain_feats[0] == "pr_next3__28.0000_-81.0000"
+
+
+def test_run_respects_start_for_short_records(history):
+    h = dict(history)
+    h["pr"] = history["pr"].loc["2002-01-01":]
+    h["pet"] = history["pet"].loc["2002-01-01":]
+
+    res = analysis_run.run(h, horizons=(3,), past_windows=(1, 3), train_end="2005-12-31", max_k=3)
+
+    assert res["selection"][3]["feature"].iloc[0] == "stage"

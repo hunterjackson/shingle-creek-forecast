@@ -54,6 +54,7 @@ def run(
     max_k: int = 15,
     min_partial_r: float = 0.03,
     cluster_threshold: float = 0.9,
+    target: str = "stage",
 ) -> dict:
     """Selection uses only data <= train_end, so later evaluation periods stay untouched."""
     cut = pd.Timestamp(train_end)
@@ -63,9 +64,15 @@ def run(
     pet = history["pet"].loc[:cut]
 
     S = state_controls(gauge, upstream)
+    if target == "stage":
+        level = gauge["stage_ft"]
+    elif target == "log_q":
+        level = np.log1p(gauge["discharge_cfs"])
+    else:
+        raise ValueError(f"unknown target {target!r}")
     selection, scores = {}, {}
     for h in horizons:
-        y = analysis.future_change(gauge["stage_ft"], h)
+        y = analysis.future_change(level, h)
         X = candidate_features(pr, pet, past_windows, horizon=h)
         data = S.join(X, how="inner")
         selection[h] = analysis.greedy_select(
@@ -74,12 +81,13 @@ def run(
         nxt = X.filter(like=f"pr_next{h}__")
         scores[h] = analysis.univariate_scores(nxt.rename(columns=lambda c: c.split("__")[1]), y)
 
-    dstage = gauge["stage_ft"].diff()
+    dlevel = level.diff()
     return {
         "train_end": train_end,
+        "target": target,
         "selection": selection,
         "scores": scores,
-        "cross_corr": analysis.cross_corr(pr, dstage, max_lag=14),
+        "cross_corr": analysis.cross_corr(pr, dlevel, max_lag=14),
         "clusters": analysis.redundancy_clusters(analysis.trailing_sum(pr, 3).dropna(), cluster_threshold),
     }
 
