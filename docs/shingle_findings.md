@@ -233,3 +233,21 @@ Ian (crest 64.15 ft daily mean, 2022-10-01; above training max):
   resolve 2 km regions anyway. Radar's practical role: **near-real-time recent observed rain** (gridMET
   lags 1–2 days) for the live pipeline.
 - Coverage in val 0.71–0.80 (only 2 val years → leave-one-year-out calibrates on 1 year; noisy).
+
+## 2026-11-21 — lightweight data screening (screen.py) + issue-time gauge readings
+Method: correlate candidates (level, 1/7-day change, 30/365-day anomaly) with *out-of-fold* residuals
+of hybrid+gr4j (1979–2023, blocked 3-yr folds; OOF MAE perfect rain .070/.155/.237, no future rain
+.073/.200/.375), moving-block bootstrap CI. Only candidates that explain residuals get wired in.
+- **Ruled out** (operating, long record; |r| ≤ 0.11 at all horizons): USGS surficial wells (Lake Oliver,
+  Palm Lake Dr, Lake Sawyer, Sea World Dr, Disney tree farm, Orlo Vista), Big Sand/Butler/Conway lakes,
+  Lake Kissimmee, S-65, Okeechobee, Toho west, NWM retro flow.
+- Discontinued but informative (r ≈ 0.2, unusable live): Shingle Ck at Oak Ridge Rd 02263692 + rain gauge
+  (2006–10), Lake Adair wells (1984–88). Hint: better in-basin observed rain still has value.
+- **USGS instantaneous values (2007+): next-morning (12Z) reading − day-t mean** → r .69/.36/.17 with
+  h1/h3/h7 residuals. Implemented (fetch_iv_history, dataset.issue_reading, *_am_d features).
+- First val test (train ≤2021, 2007+ rows when using am features; perfect rain):
+  hybrid MAE h1 .080 → **.051** (+am), h3 .175 → .165, h7 ≈ same; low-water h3 .054 → .042.
+  ARX +am: Ian peak error h1 +0.09, **h3 +0.07** (was −0.81); but hybrid +am **overshoots Ian at h3
+  (+3.6 ft)** → am features in the log-Q model extrapolate badly in the record flood; needs a fix
+  (e.g. carry the morning rating residual instead of feeding am deltas to the flow model, or blend
+  ARX+am for h1–h3 with hybrid for h4–7).
