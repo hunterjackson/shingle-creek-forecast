@@ -20,3 +20,10 @@ FLOOD_STAGES = {"action": 59.0, "minor": 60.0, "moderate": 61.0, "major": 62.0}
 DATA_DIR = Path("data")
 MODELS_DIR = Path("models")
 OUT_DIR = Path("out")
+
+# Evaluation split (user decision 2026-11-20): radar starts mid-2018, so
+# train <= 2021, validate 2022-2023 (Ian = validation storm, plus leave-Ian-out
+# extrapolation refit), test 2024+ (Milton; real archived lead-time rain forecasts).
+TRAIN_END = "2021-12-31"
+VAL_END = "2023-12-31"
+MRMS_START = "2018-06-30"
