@@ -208,3 +208,28 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
 - Design: regional (cluster-mean) radar features, keep (kind, region) with pooled freq ≥ 0.5.
   Radar only spans 2018-07+, so use it in a residual corrector on top of the long-record
   (gridMET) hybrid rather than as the sole input.
+
+## 2026-11-20 — validation on NEW split (train ≤2021, val 2022–23 incl. Ian), GR4J recalibrated ≤2021 (NSE .66)
+Radar regions persisted to data/radar_regions.json (18 regions, r≥.85, train-only; ids match the
+stability analysis: R12 28.367,−81.446; R13 28.272,−81.428; R18 28.468,−81.387).
+Reports: out/model_comparison_val_{perfect,nofuture}.md.
+
+| MAE ft | h1/h3/h7 perfect rain | ≥59 h7 | low h7 | h1/h3/h7 NO future rain | ≥59 h7 | low h7 |
+|---|---|---|---|---|---|---|
+| persistence | .127/.326/.584 | 4.88 | .198 | same | 4.88 | .198 |
+| ARX lgbm + gr4j | **.075**/.168/**.243** | 1.52 | .121 | **.074**/.241/.455 | **3.65** | .296 |
+| **hybrid + gr4j** | .080/.175/.254 | **1.19** | .093 | .080/**.237**/**.440** | 4.07 | **.183** |
+| hybrid gr4j-offset | .080/**.166**/.265 | 2.24 | **.089** | – | – | – |
+| hybrid + gr4j + radar corr. | .082/.172/.260 | 1.27 | .160 | .081/.246/.472 | 3.93 | .295 |
+
+Ian (crest 64.15 ft daily mean, 2022-10-01; above training max):
+- perfect rain: hybrid+gr4j peak err h1 +0.21, h3 −0.43 (3 d late), **h7 +0.54 (1 d early)**;
+  ARX h7 −2.33 (7 d late = no warning); **gr4j-offset overshoots +2.3/+4.0/+5.1 ft** → unconstrained
+  physical extrapolation is dangerous; offset variant ruled out.
+- no future rain: hybrid h1 −0.25, h3 −1.30, h7 −3.07; no week-ahead warning without rain forecasts.
+- **Radar corrector adds no skill** (and hurts low water .093→.160) in either bracket. Relevance analysis
+  found real regional signal, but on top of GR4J + basin-scale gridMET at daily resolution it doesn't
+  transfer with 3.5 training years. Also: live future rain comes from ~10–25 km NWP grids, which can't
+  resolve 2 km regions anyway. Radar's practical role: **near-real-time recent observed rain** (gridMET
+  lags 1–2 days) for the live pipeline.
+- Coverage in val 0.71–0.80 (only 2 val years → leave-one-year-out calibrates on 1 year; noisy).
