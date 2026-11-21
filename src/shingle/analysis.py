@@ -156,3 +156,18 @@ def stability_select(
         {"freq": {f: c / n_boot for f, c in counts.items()}, "mean_partial_r": {f: float(np.mean(v)) for f, v in rs.items()}}
     )
     return out.sort_values("freq", ascending=False)
+
+
+def pool_by_cluster(freq: pd.DataFrame, clusters: pd.Series, prefix: str = "r") -> pd.DataFrame:
+    """Sum stability frequencies of '{kind}__{cell}' features within each (kind, region).
+
+    Adjacent, highly correlated cells split bootstrap picks between them; the
+    pooled frequency measures how stably the *region* is selected. Capped at 1.
+    """
+    kinds = [f.split("__")[0] for f in freq.index]
+    regions = [f"{prefix}{clusters[f.split('__')[1]]}" for f in freq.index]
+    df = freq.assign(name=[f"{k}__{r}" for k, r in zip(kinds, regions)])
+    weighted_r = (df["mean_partial_r"] * df["freq"]).groupby(df["name"]).sum()
+    total = df.groupby("name")["freq"].sum()
+    out = pd.DataFrame({"freq": total.clip(upper=1.0), "mean_partial_r": weighted_r / total})
+    return out.sort_values("freq", ascending=False)

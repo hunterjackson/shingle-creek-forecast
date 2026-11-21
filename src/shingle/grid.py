@@ -32,3 +32,12 @@ def nearest(targets: pd.DataFrame, sources: pd.DataFrame) -> pd.Series:
 
 def remap(src: pd.DataFrame, mapping: pd.Series) -> pd.DataFrame:
     return pd.DataFrame({t: src[s] for t, s in mapping.items()}, index=src.index)
+
+
+def region_means(df: pd.DataFrame, clusters: pd.Series, prefix: str = "r") -> pd.DataFrame:
+    """Mean of member cells per region (NaN-aware); columns '{prefix}{cluster_id}'."""
+    out = {}
+    for cid in sorted(clusters.unique()):
+        members = [c for c in clusters.index[clusters == cid] if c in df.columns]
+        out[f"{prefix}{cid}"] = df[members].mean(axis=1, skipna=True)
+    return pd.DataFrame(out, index=df.index)

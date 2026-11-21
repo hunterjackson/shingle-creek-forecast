@@ -145,3 +145,19 @@ def test_stability_select_excludes_forced_from_table(planted):
     freq = analysis.stability_select(X, y, n_boot=5, block_days=400, max_k=3, forced=["ctrl"], seed=0)
 
     assert "ctrl" not in freq.index
+
+
+def test_pool_by_cluster_sums_feature_frequencies_per_kind_and_region():
+    freq = pd.DataFrame(
+        {"freq": [0.4, 0.45, 0.3, 0.2], "mean_partial_r": [0.6, 0.6, 0.2, 0.1]},
+        index=["pr_next3__a", "pr_next3__b", "pr_past1__a", "pr_next3__c"],
+    )
+    clusters = pd.Series({"a": 1, "b": 1, "c": 2})
+
+    pooled = analysis.pool_by_cluster(freq, clusters)
+
+    assert pooled.loc["pr_next3__r1", "freq"] == pytest.approx(0.85)
+    assert pooled.loc["pr_past1__r1", "freq"] == pytest.approx(0.3)
+    assert pooled.loc["pr_next3__r2", "freq"] == pytest.approx(0.2)
+    assert pooled["freq"].is_monotonic_decreasing
+    assert pooled["freq"].max() <= 1.0

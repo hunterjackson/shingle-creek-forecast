@@ -58,3 +58,15 @@ def test_remap_columns_builds_frame_for_target_cells():
 
     assert list(out.columns) == ["t1", "t2", "t3"]
     assert out["t1"].tolist() == [3.0, 4.0]
+
+
+def test_region_means_average_member_cells():
+    idx = pd.date_range("2020-01-01", periods=2, name="date")
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, np.nan], "c": [10.0, 20.0]}, index=idx)
+    clusters = pd.Series({"a": 1, "b": 1, "c": 2})
+
+    out = grid.region_means(df, clusters)
+
+    assert list(out.columns) == ["r1", "r2"]
+    assert out["r1"].tolist() == [2.0, 2.0]
+    assert out["r2"].tolist() == [10.0, 20.0]
