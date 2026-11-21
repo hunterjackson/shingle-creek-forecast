@@ -70,7 +70,8 @@ def test_load_history_returns_named_frames(tmp_path, fake_sources):
 
     h = fetch.load_history(tmp_path)
 
-    assert set(h) == {"gauge", "upstream", "pr", "pet", "cells", "basin", "lakes"}
+    assert set(h) == {"gauge", "upstream", "pr", "pet", "cells", "basin", "lakes", "iv"}
+    assert h["iv"] == {"gauge": None, "upstream": None}  # no IV files fetched yet
     assert list(h["lakes"].columns) == list(dbhydro.SERIES)
     assert h["lakes"]["toho_stage"].iloc[0] == 53.0
     assert h["gauge"]["stage_ft"].iloc[0] == 55.0
@@ -127,3 +128,37 @@ def test_fetch_mrms_history_checkpoints_by_month_and_skips_complete_months(tmp_p
     assert df.index.min() == pd.Timestamp("2024-01-15")
     assert df.index.max() == pd.Timestamp("2024-03-20")
     assert df.index.is_unique
+
+
+def test_fetch_iv_history_pulls_yearly_then_incrementally(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_iv(site, start, end=None, client=None):
+        calls.append((site, start, end))
+        idx = pd.date_range(pd.Timestamp(start).tz_localize(None), pd.Timestamp(end).tz_localize(None), freq="6h", tz="UTC", name="time")
+        return pd.DataFrame({"discharge_cfs": 100.0, "stage_ft": 55.0}, index=idx)
+
+    monkeypatch.setattr(usgs, "fetch_iv", fake_iv)
+
+    fetch.fetch_iv_history(tmp_path, sites=("A",), start="2021-06-01", today="2023-03-10")
+    first = [c for c in calls]
+    assert [c[1][:10] for c in first] == ["2021-06-01", "2022-01-01", "2023-01-01"]
+    df = pd.read_parquet(tmp_path / "usgs_iv_A.parquet")
+    assert df.index.is_unique and df.index.max() >= pd.Timestamp("2023-03-09", tz="UTC")
+
+    calls.clear()
+    fetch.fetch_iv_history(tmp_path, sites=("A",), start="2021-06-01", today="2023-03-20")
+    assert len(calls) == 1 and calls[0][1][:10] == "2023-03-07"  # last stored day - 3
+    df2 = pd.read_parquet(tmp_path / "usgs_iv_A.parquet")
+    assert df2.index.is_unique and df2.index.min() == df.index.min()
+    assert df2.index.max() >= pd.Timestamp("2023-03-19", tz="UTC")
+
+
+def test_load_history_includes_iv_when_present(tmp_path, fake_sources, monkeypatch):
+    fetch.fetch_history(tmp_path, today="2020-01-10", start="2020-01-01")
+    t = pd.date_range("2020-01-01", periods=48, freq="1h", tz="UTC", name="time")
+    pd.DataFrame({"discharge_cfs": 1.0, "stage_ft": 55.0}, index=t).to_parquet(tmp_path / f"usgs_iv_{config.SITE}.parquet")
+
+    h = fetch.load_history(tmp_path)
+
+    assert len(h["iv"]["gauge"]) == 48 and h["iv"]["upstream"] is None

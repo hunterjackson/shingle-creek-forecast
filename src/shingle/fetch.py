@@ -59,6 +59,7 @@ def load_history(data_dir: Path) -> dict:
         "cells": pd.read_parquet(data_dir / "cells.parquet"),
         "lakes": dbhydro.named(pd.read_parquet(data_dir / "dbhydro.parquet")),
         "basin": nldi.parse_basin(json.loads((data_dir / "basin.geojson").read_text())),
+        "iv": {"gauge": load_iv(data_dir, config.SITE), "upstream": load_iv(data_dir, config.UPSTREAM_SITE)},
     }
 
 
@@ -108,3 +109,34 @@ def load_mrms(data_dir: Path) -> pd.DataFrame:
     df = df[~df.index.duplicated(keep="last")]
     df.index.name = "date"
     return df
+
+
+IV_START = "2007-01-01"  # NWIS instantaneous-value archive starts ~2007 for our gauges
+
+
+def fetch_iv_history(data_dir: Path, sites=None, start: str = IV_START, today: str | None = None, overlap_days: int = 3) -> None:
+    """Hourly-mean instantaneous discharge/stage per site -> data/usgs_iv_{site}.parquet.
+
+    First run pulls year by year from `start`; later runs re-fetch from the last
+    stored day minus `overlap_days` (provisional values get revised).
+    """
+    sites = sites or (config.SITE, config.UPSTREAM_SITE)
+    end_ts = pd.Timestamp(today) if today else pd.Timestamp.now(tz="UTC").tz_localize(None).normalize() + pd.Timedelta(days=1)
+    for site in sites:
+        path = Path(data_dir) / f"usgs_iv_{site}.parquet"
+        old = pd.read_parquet(path) if path.exists() else None
+        s = (old.index.max().tz_localize(None).normalize() - pd.Timedelta(days=overlap_days)) if old is not None else pd.Timestamp(start)
+        parts = []
+        while s < end_ts:
+            e = min(pd.Timestamp(f"{s.year}-12-31 23:59"), end_ts)
+            parts.append(usgs.fetch_iv(site, s.strftime("%Y-%m-%dT%H:%MZ"), e.strftime("%Y-%m-%dT%H:%MZ")))
+            s = pd.Timestamp(f"{s.year + 1}-01-01")
+        new = pd.concat([old] + parts if old is not None else parts).sort_index()
+        new = new[~new.index.duplicated(keep="last")]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        new.to_parquet(path)
+
+
+def load_iv(data_dir: Path, site: str) -> pd.DataFrame | None:
+    path = Path(data_dir) / f"usgs_iv_{site}.parquet"
+    return pd.read_parquet(path) if path.exists() else None

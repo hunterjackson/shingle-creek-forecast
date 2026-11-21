@@ -165,3 +165,13 @@ def test_rad_prefix_reads_radar_frame(data):
     assert X[f"pr_past3__{CELL}"].iloc[t] == pytest.approx(np.log1p(data["pr"][CELL].iloc[t - 2 : t + 1].sum()))
     wb = (2 * data["pr"][CELL] - data["pet"][CELL]).iloc[t - 29 : t + 1].sum()
     assert X[f"rad_wb_past30__{CELL}"].iloc[t] == pytest.approx(wb)
+
+
+def test_issue_time_reading_features(data):
+    d = dict(data, stage_am=data["stage"] + 0.3, q_am=data["q"] * 2, q_up_am=data["q_up"] * 3)
+
+    X = features.build(d, ["stage_am_d", "log_q_am_d", "log_q_up_am_d"])
+
+    np.testing.assert_allclose(X["stage_am_d"], 0.3)
+    np.testing.assert_allclose(X["log_q_am_d"], np.log1p(d["q"] * 2) - np.log1p(d["q"]))
+    np.testing.assert_allclose(X["log_q_up_am_d"], np.log1p(d["q_up"] * 3) - np.log1p(d["q_up"]))

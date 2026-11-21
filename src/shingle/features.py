@@ -14,6 +14,9 @@ Name grammar (matches analysis_run.candidate_features):
   gr4j_dH              GR4J simulated log-flow change t -> t+h (driven by future rain)
   rad_<rain feature>    any pr_/wb_ feature computed on data['radar'] (MRMS regions)
   log_s61, log_s59     log1p structure outflows (S-61 Toho, S-59 East Toho)
+  stage_am_d, log_q_am_d, log_q_up_am_d
+                       issue-time (next-morning) instantaneous reading minus day-t mean
+                       (data['stage_am'|'q_am'|'q_up_am'], see dataset.issue_reading)
 
 `data` keys: stage, q, q_up (Series); pr, pet (wide per-cell frames);
 toho, s61_q, s59_q, etoho (Series) when lake features are used.
@@ -74,6 +77,12 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
         return np.log1p(data["s59_q"].clip(lower=0))
     if name == "etoho":
         return data["etoho"]
+    if name == "stage_am_d":
+        return data["stage_am"] - data["stage"]
+    if name == "log_q_am_d":
+        return np.log1p(data["q_am"].clip(lower=0)) - np.log1p(data["q"])
+    if name == "log_q_up_am_d":
+        return np.log1p(data["q_up_am"].clip(lower=0)) - np.log1p(data["q_up"])
     if name == "log_q_up":
         return np.log1p(data["q_up"])
     if name in ("doy_sin", "doy_cos"):
