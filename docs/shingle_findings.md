@@ -175,3 +175,19 @@ Hybrid = RatingHybrid(flow DirectRegressor log_q, lake DirectRegressor toho) + r
   09-29 113 mm (37–184); Milton 10-09 140 mm (42–242).
 - Split problem: radar starts mid-2018, so under the current split (val 2016–19, test 2020+) only
   ~1.5 radar years are available for selection/training. Split decision pending with user.
+
+## 2026-11-20 — radar (MRMS, 2 km blocks) relevance analysis, train 2018-07..2021-12
+- 330 blocks (2 km), 92 touch basin, 65 >50 % inside. In-basin daily corr median .75 (min .51).
+  Redundancy clusters (3-day sums, in-basin): 8 @ r≥.9, 2 @ r≥.8, 1 @ r≥.7.
+- Greedy partial-corr, target Δlog Q (controls forced; cum R² after controls ≈ .11–.16):
+  - h1: pr_past1 @ 28.33,−81.47 (in basin, 7 km) partial r **.61** → cum R² .46
+  - h3: pr_next3 @ 28.33,−81.49 (94 % in, 8 km) r **.61** → .44
+  - h7: pr_next7 @ 28.41,−81.43 (in basin, 16 km upstream) r **.73** → .61
+  - nearer cells for short horizons, further-upstream cell for 7-day: physically sensible.
+- Stage target gives the same pattern, weaker (rain partial r .43–.50; stage confounded by Toho).
+- Univariate: best cells are in-basin 2–7 km from gauge (Spearman .51 for next-3-day vs Δlog Q);
+  in-basin mean .457 vs outside .434 (neighbours still correlated).
+- Peak cross-corr lag = 1 day for every cell (basin ~35 km long; daily resolution can't resolve
+  travel-time differences).
+- After the first 1–2 rain picks, greedy selections scatter (outside cells, sign flips) →
+  overfitting with ~1200 rows × ~3000 candidates. Need stability selection.
