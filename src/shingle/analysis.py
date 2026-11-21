@@ -113,3 +113,46 @@ def redundancy_clusters(X: pd.DataFrame, threshold: float = 0.9) -> pd.Series:
     Z = linkage(squareform(dist, checks=False), method="average")
     labels = fcluster(Z, t=1 - threshold, criterion="distance")
     return pd.Series(labels, index=X.columns, name="cluster")
+
+
+def stability_select(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_boot: int = 50,
+    block_days: int = 180,
+    max_k: int = 8,
+    min_partial_r: float = 0.0,
+    forced: list[str] | None = None,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Moving-block bootstrap around greedy_select.
+
+    Contiguous blocks keep autocorrelation (storms, wet seasons) intact. A
+    feature that is truly informative is picked in most resamples; features
+    picked by chance (multiple comparisons) are not. Returns selection
+    frequency and mean partial r for every non-forced feature ever picked.
+    """
+    forced = list(forced or [])
+    rng = np.random.default_rng(seed)
+    n = len(X)
+    starts = np.arange(0, n, block_days)
+    counts: dict[str, int] = {}
+    rs: dict[str, list[float]] = {}
+    for _ in range(n_boot):
+        pos = []
+        while len(pos) < n:
+            s = int(rng.choice(starts))
+            pos.extend(range(s, min(s + block_days, n)))
+        pos = np.array(pos[:n])
+        Xb = X.iloc[pos].reset_index(drop=True)
+        yb = y.iloc[pos].reset_index(drop=True)
+        sel = greedy_select(Xb, yb, max_k=len(forced) + max_k, min_partial_r=min_partial_r, forced=forced)
+        for feat, r in zip(sel["feature"], sel["partial_r"]):
+            if feat in forced:
+                continue
+            counts[feat] = counts.get(feat, 0) + 1
+            rs.setdefault(feat, []).append(r)
+    out = pd.DataFrame(
+        {"freq": {f: c / n_boot for f, c in counts.items()}, "mean_partial_r": {f: float(np.mean(v)) for f, v in rs.items()}}
+    )
+    return out.sort_values("freq", ascending=False)

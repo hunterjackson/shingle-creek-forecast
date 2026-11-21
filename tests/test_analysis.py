@@ -120,3 +120,28 @@ def test_univariate_scores_rank_true_driver_highest(planted):
     assert list(scores.columns) == ["pearson", "spearman", "mutual_info"]
     assert scores["pearson"].idxmax() in {"c2", "c3"}
     assert scores.loc["c0", "pearson"] < 0.1
+
+
+def test_stability_select_keeps_true_drivers_and_drops_noise(planted):
+    X, y = planted
+    # add many pure-noise candidates to provoke spurious greedy picks
+    rng = np.random.default_rng(1)
+    for i in range(60):
+        X[f"noise{i}"] = rng.gamma(0.4, 8, len(X))
+
+    freq = analysis.stability_select(X, y, n_boot=30, block_days=200, max_k=4, seed=0)
+
+    assert list(freq.columns) == ["freq", "mean_partial_r"]
+    top = freq[freq["freq"] >= 0.6].index
+    assert ({"c2", "c3"} & set(top)) and ({"c7", "c8"} & set(top))
+    assert not any(t.startswith("noise") for t in top)
+    assert freq["freq"].between(0, 1).all()
+
+
+def test_stability_select_excludes_forced_from_table(planted):
+    X, y = planted
+    X = X.assign(ctrl=X["c0"])
+
+    freq = analysis.stability_select(X, y, n_boot=5, block_days=400, max_k=3, forced=["ctrl"], seed=0)
+
+    assert "ctrl" not in freq.index
