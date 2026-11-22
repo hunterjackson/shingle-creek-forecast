@@ -296,3 +296,13 @@ Morning features: only for h ≤ 3 and trained on the full record (LightGBM `all
   .49/.42/.43 vs GEFS .58/.61/.50; 3-day totals .51 vs .65; average of both ≈ GEFS) — and ECMWF ENS has
   no ensemble-mean tp (51 members × 0.8 MB per step → too heavy).
 - Remaining h7 gap (.34–.37 vs .23 perfect) is forecast information loss, not model misuse.
+
+## 2026-11-21 — packaged pipeline check + uncertainty bands (val 2022–23)
+- train.train(train_end 2021-12-31, GEFS-era OOF bands) + train.backtest reproduce the scratch numbers:
+  MAE with issued GEFS h1..h7 = .039/.109/.166/.230/.263/.300/.339 (perfect rain .039/.100/.144/.193/.211/.220/.223).
+- 80 % bands: overall coverage .72–.80, but flood-day (≥59 ft, n=14, ≈Ian) coverage only .43–.71.
+  Calibration window (2020-10..2021-12, 450 days) contains no flood.
+- Tried (val): band scale + GEFS spread (additive / multiplicative / spread-only) and a wet-scenario p90
+  (point forecast with mean+1σ rain): none clearly better on floods (±1 day of 14); wet p90 lifts overall
+  coverage at h5–7 to .82–.85 at +0.3–0.9 ft width. Kept the simple |p50−stage|-binned bands. The final
+  model's calibration window (2020-10..2023-12) includes Ian.
