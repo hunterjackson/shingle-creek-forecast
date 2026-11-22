@@ -10,6 +10,6 @@ wheels/
 .venv
 
 # Data / artifacts
-data/
-models/
-out/
+/data/
+/models/
+/out/
