@@ -59,3 +59,34 @@ def fill_pet(pet: pd.DataFrame, clim: pd.DataFrame) -> pd.DataFrame:
 def ffill_recent(s: pd.Series, limit: int = 3) -> pd.Series:
     """Carry the last observation forward at most `limit` days (lake levels change slowly)."""
     return s.ffill(limit=limit)
+
+
+def prepare_history(hist: dict, issue_day, radar_cells: pd.DataFrame | None, radar_scale: float, pet_clim: pd.DataFrame,
+                    lake_limit: int = 3) -> dict:
+    """Extend every input through `issue_day` the way the morning forecast run can:
+    gauge/upstream daily means from IV where dv is unpublished, lakes carried forward,
+    rain after gridMET's last day from scaled radar, PET from climatology."""
+    day = pd.Timestamp(issue_day).normalize()
+    idx = pd.date_range(hist["gauge"].index.min(), day, name="date")
+    h = dict(hist)
+    iv = hist.get("iv") or {}
+    from_iv = []
+    for key in ("gauge", "upstream"):
+        df = hist[key].reindex(idx)
+        if iv.get(key) is not None:
+            d = daily_from_iv(iv[key]).reindex(idx)
+            missing = df["discharge_cfs"].isna() if "discharge_cfs" in df else df.isna().all(axis=1)
+            cols = [c for c in df.columns if c in d.columns]
+            fill_rows = missing & d[cols].notna().any(axis=1)
+            df.loc[fill_rows, cols] = d.loc[fill_rows, cols]
+            if key == "gauge":
+                from_iv = list(idx[fill_rows & (idx > hist[key].dropna(how="all").index.max())])
+        h[key] = df
+    h["lakes"] = hist["lakes"].reindex(idx).apply(lambda s: ffill_recent(s, lake_limit))
+    pr = hist["pr"].reindex(idx)
+    if radar_cells is not None:
+        pr = fill_rain(pr, radar_cells, radar_scale)
+    h["pr"] = pr
+    h["pet"] = fill_pet(hist["pet"].reindex(idx), pet_clim)
+    h["live_fill"] = {"rain_from": pr.attrs.get("filled_from"), "gauge_from_iv": from_iv}
+    return h

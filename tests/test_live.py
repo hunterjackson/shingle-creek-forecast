@@ -60,3 +60,33 @@ def test_ffill_recent_limits_staleness():
 
     assert out.tolist()[:4] == [1.0, 2.0, 2.0, 2.0]
     assert np.isnan(out.iloc[4])
+
+
+def _hist(n=40, end_gap=2):
+    idx = pd.date_range("2024-01-01", periods=n, name="date")
+    gauge = pd.DataFrame({"discharge_cfs": 100.0, "stage_ft": 55.0}, index=idx[:-end_gap])  # dv not yet published
+    lakes = pd.DataFrame({"toho_stage": 54.0, "s61_q": 200.0, "s59_q": 50.0, "etoho_stage": 56.0}, index=idx[:-3])
+    pr = pd.DataFrame({"c": 1.0}, index=idx[:-2])  # gridMET lags 2 days
+    pet = pd.DataFrame({"c": 3.0}, index=idx[:-2])
+    t = pd.date_range(idx[0] + pd.Timedelta(hours=5), idx[-1] + pd.Timedelta(days=1, hours=13), freq="1h", tz="UTC")
+    iv = pd.DataFrame({"discharge_cfs": 150.0, "stage_ft": 55.5}, index=t)
+    return idx, {"gauge": gauge, "upstream": gauge * 0.5, "lakes": lakes, "pr": pr, "pet": pet,
+                 "iv": {"gauge": iv, "upstream": iv * 0.5}}
+
+
+def test_prepare_live_history_fills_everything_through_issue_day():
+    idx, hist = _hist()
+    issue = idx[-1]
+    radar = pd.DataFrame({"c": 4.0}, index=idx)
+    clim = pd.DataFrame({"c": 2.5}, index=range(1, 367))
+
+    h = live.prepare_history(hist, issue, radar_cells=radar, radar_scale=1.5, pet_clim=clim)
+
+    assert h["gauge"].index[-1] == issue
+    assert h["gauge"].loc[issue, "stage_ft"] == pytest.approx(55.5)      # from IV daily mean
+    assert h["gauge"].loc[idx[0], "stage_ft"] == 55.0                    # published dv kept
+    assert h["upstream"].loc[issue, "discharge_cfs"] == pytest.approx(75.0)
+    assert h["lakes"].loc[issue, "toho_stage"] == 54.0                   # carried forward 3 days
+    assert h["pr"].loc[issue, "c"] == pytest.approx(6.0) and h["pr"].loc[idx[-3], "c"] == 1.0
+    assert h["pet"].loc[issue, "c"] == 2.5
+    assert h["live_fill"] == {"rain_from": idx[-2], "gauge_from_iv": [idx[-2], idx[-1]]}
