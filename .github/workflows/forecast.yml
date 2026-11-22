@@ -1,0 +1,83 @@
+name: Forecast
+
+# Every 3 hours. 13:30 UTC is the first run each day with the 12Z gauge reading,
+# the MRMS 24 h radar total ending 12Z and the 00Z GEFS run, i.e. a new issue day;
+# the other runs refresh the current reading and pick up late-arriving data.
+on:
+  schedule:
+    - cron: "30 1-22/3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shingle-pipeline
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+
+      - name: Restore input cache
+        id: cache
+        uses: actions/cache/restore@v6
+        with:
+          path: data
+          key: inputs-${{ github.run_id }}
+          restore-keys: inputs-
+
+      - name: Download model (and input history if the cache is empty)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p models
+          gh release download model --pattern shingle.pkl --dir models --clobber
+          if [ -z "${{ steps.cache.outputs.cache-matched-key }}" ]; then
+            gh release download inputs --pattern inputs.tar.gz --clobber
+            tar -xzf inputs.tar.gz && rm inputs.tar.gz
+          fi
+
+      - run: uv sync --locked
+
+      - name: Forecast
+        run: uv run shingle predict --log site/data/forecast_log.csv
+
+      - name: Build site data
+        run: uv run shingle site --log site/data/forecast_log.csv --out-dir site/data
+
+      - name: Save input cache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: data
+          key: inputs-${{ github.run_id }}
+
+      - name: Commit forecast data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/data
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -q -m "Update forecast data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull -q --rebase origin main
+          git push -q
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v5

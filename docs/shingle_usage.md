@@ -5,7 +5,13 @@ uv run shingle fetch            # update USGS daily, gridMET, DBHYDRO caches in 
 uv run shingle train            # fit models/shingle.pkl on everything up to 8 days ago (~3 min)
 uv run shingle predict          # update live inputs, write out/shingle.json, append out/forecast_log.csv
 uv run shingle score            # verify logged forecasts (ours vs NWM short-range h1) as observations arrive
+uv run shingle update           # refresh all inputs without predicting
+uv run shingle site             # write site/data/{forecast,observed,scorecard}.json for the static site
 ```
+
+In production this all runs on GitHub Actions (see README): `forecast.yml` every 3 h, `train.yml` monthly.
+Manual runs: `gh workflow run forecast.yml` / `gh workflow run train.yml`. To publish a locally trained model:
+`gh release upload model models/shingle.pkl --clobber`.
 
 Run `predict` once a day after ~13Z (08:00 EST / 09:00 EDT), when the 12Z gauge readings and the MRMS
 24 h radar total ending 12Z are published. The forecast is for issue day t = yesterday, and covers t+1 to t+7.

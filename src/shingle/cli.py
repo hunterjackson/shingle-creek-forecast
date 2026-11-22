@@ -16,6 +16,9 @@ def main(argv: list[str] | None = None) -> None:
     p_fetch.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
     p_fetch.add_argument("--refresh", action="store_true", help="ignore cache and refetch everything")
 
+    p_update = sub.add_parser("update", help="refresh all model inputs (history caches, IV, radar, GEFS) without predicting")
+    p_update.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
+
     p_train = sub.add_parser("train", help="fit the forecast model artifact")
     p_train.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
     p_train.add_argument("--model", type=Path, default=pipeline.MODEL_PATH)
@@ -41,6 +44,8 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.cmd == "fetch":
         fetch.fetch_history(args.data_dir, refresh=args.refresh)
+    elif args.cmd == "update":
+        pipeline.update_inputs(args.data_dir)
     elif args.cmd == "train":
         import pandas as pd
 

@@ -39,3 +39,14 @@ def test_site_subcommand_builds_site_data(monkeypatch, tmp_path):
     cli.main(["site", "--data-dir", str(tmp_path), "--forecast", "f.json", "--log", "l.csv", "--out-dir", "site/data"])
 
     assert seen == {"d": tmp_path, "f": Path("f.json"), "l": Path("l.csv"), "o": Path("site/data")}
+
+
+def test_update_subcommand_refreshes_live_inputs(monkeypatch, tmp_path):
+    from shingle import pipeline
+
+    seen = {}
+    monkeypatch.setattr(pipeline, "update_inputs", lambda data_dir: seen.update(d=data_dir))
+
+    cli.main(["update", "--data-dir", str(tmp_path)])
+
+    assert seen == {"d": tmp_path}
