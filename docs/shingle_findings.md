@@ -270,3 +270,29 @@ Morning features: only for h ≤ 3 and trained on the full record (LightGBM `all
 | **blend .5 arx2/hyb2** | **.040/.146/.228** | **0.87** | .104 | .041/**.224/.432** | 3.62 | .233 | −.15/+.35/−.78 |
 - Morning reading halves h1 error in both brackets; blend is best overall and for floods; hybrid alone
   remains best for low water at h7. Next: weights chosen out-of-sample (not on val), real forecast rain.
+
+## 2026-11-21 — real rain forecasts (GEFSv12 ensemble mean, AWS archive 2020-10+)
+- Source: s3://noaa-gefs-pds GEFSv12 geavg/gespr 0.5°, APCP 6 h buckets fetched by byte range (~88 KB
+  each, ~2.5 MB/run). Issue convention: 00Z run of day t+1 serves issue day t (forecast ~12Z); lead k =
+  gridMET day t+k. Bilinear to gridMET cells; GR4J restarted from its day-t state with forecast areal rain.
+- Skill at the model cell vs gridMET (2020-10..2022-10): corr lead1 .89, lead3 .59, lead5 .45, lead7 .29;
+  3-day totals .83, 7-day .75. GEFS mean under-forecasts amounts (2.5 vs 3.9 mm/d, ratio ~0.64).
+  GR4J forecast dH vs perfect-rain dH: corr .996/.92/.69 (h1/h3/h7).
+- **Honest val 2022–23 (models fit ≤2021 on observed rain, predicted with issued GEFS forecasts; bands
+  calibrated on forecast-mode residuals):**
+
+| MAE h1/h3/h7 | raw GEFS | ≥59 h7 | low h7 | GEFS × per-lead scale | ≥59 h7 | low h7 |
+|---|---|---|---|---|---|---|
+| persistence | .127/.326/.584 | 4.88 | .198 | same | 4.88 | .198 |
+| hyb2 | .052/.186/.398 | 2.66 | **.112** | .053/.186/.363 | 2.21 | .170 |
+| arx2 | **.039/.168**/.370 | 2.54 | .130 | .041/.175/.343 | 2.11 | .188 |
+| blend arx2/hyb2 | .040/.170/.368 | 2.24 | .119 | .041/.174/**.338** | **1.73** | .176 |
+| (perfect rain blend) | .040/.146/.228 | 0.87 | .104 | | | |
+| (no-rain blend) | .041/.224/.432 | 3.62 | .233 | | | |
+  Ian with scaled GEFS: hyb fp h7 −0.17 ft (3 d late), blend −1.31; POD≥59 h7 .79 (blend), FAR 0.
+- Ruled out quickly: (a) blending forecast-driven with no-rain model (oracle weight on forecast model
+  0.9–1.0 → models do not over-trust forecasts); (b) quantile mapping GEFS→gridMET (h7 .392, low .218:
+  inflates mid-lead forecasts); (c) ECMWF IFS HRES open data (2023+, 73-day sample: lead1–3 corr
+  .49/.42/.43 vs GEFS .58/.61/.50; 3-day totals .51 vs .65; average of both ≈ GEFS) — and ECMWF ENS has
+  no ensemble-mean tp (51 members × 0.8 MB per step → too heavy).
+- Remaining h7 gap (.34–.37 vs .23 perfect) is forecast information loss, not model misuse.
