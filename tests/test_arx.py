@@ -80,3 +80,8 @@ def test_arx_bands_are_state_dependent(data):
     fc = m.predict(data, idx[2000:2900])
     width = (fc["h3_p90"] - fc["h3_p10"]).round(6)
     assert width.nunique() > 1
+
+
+def test_arx_passes_allow_missing_to_regressor(data):
+    m = arx.ARX(features=FEATS, horizons=(1,), backend="lgbm", allow_missing=["dstage_1"])
+    assert m.reg.allow_missing == {"dstage_1"}

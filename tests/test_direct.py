@@ -87,3 +87,25 @@ def test_offset_feature_makes_model_learn_correction_and_extrapolate(data):
     big["gr4j"]["q"] = np.expm1(lq * 1.0 + np.where(np.arange(len(idx)) >= 2103, 2.0, 0.0))
     jump = m.predict(big, idx[2100:2101])["h3"].iloc[0]
     assert np.log1p(jump) - np.log1p(d["q"].iloc[2100]) > 1.5  # follows the +2 log jump
+
+
+def test_allow_missing_keeps_rows_with_nan_in_listed_features_for_lgbm(data):
+    idx = data["q"].index
+    # an extra, very informative signal (tomorrow's rain) that only exists for the second half
+    extra = data["pr"]["c"].shift(-1).copy()
+    extra.iloc[: len(extra) // 2] = np.nan
+    d = dict(data, pr=data["pr"].assign(x=extra))
+    feats = ["log_q", "pr_past1__x"]  # pr_past1__x = log1p(x) at t (NaN in first half)
+
+    strict = direct.DirectRegressor("log_q", feats, (1,), backend="lgbm").fit(d, idx[:2000])
+    loose = direct.DirectRegressor("log_q", feats, (1,), backend="lgbm", allow_missing=["pr_past1__x"]).fit(d, idx[:2000])
+
+    assert loose.n_train[1] > 1.5 * strict.n_train[1]  # early rows kept
+    early = idx[100:200]
+    assert strict.predict(d, early)["h1"].isna().all()
+    assert loose.predict(d, early)["h1"].notna().all()  # predicts where the extra signal is missing
+
+
+def test_allow_missing_rejected_for_ridge(data):
+    with pytest.raises(ValueError):
+        direct.DirectRegressor("log_q", ["log_q"], (1,), backend="ridge", allow_missing=["log_q"])
