@@ -338,3 +338,12 @@ archive (live runs fill the last 1–2 days with MRMS; checked separately). Scri
   → same 12Z–12Z day), bias scale gridMET/MRMS = 1.013.
 - Final-test artifact, 2024-01..2025-02 (417 days), ALL past rain from scaled MRMS instead of gridMET (worst case;
   live runs only fill the last 1–2 days): MAE h1/h3/h7 .033/.123/.301 vs gridMET .033/.126/.303 → no degradation.
+
+## 2026-11-22 — production artifact + first live forecast
+- `shingle train` (train_end 2026-11-13): 16 622 training days, bands calibrated OOF on 2 227 GEFS-era forecast days
+  (2020-10..2026-11, includes Ian and Milton), GR4J x1 16.2 / x2 −10 / x3 872 / x4 3.32, GEFS scale 1.37–1.43,
+  radar scale 0.99. ~3 min.
+- `shingle predict` at 2026-11-22 01Z (issue day 11-20; all inputs live-updated in ~2 min): stage rising after
+  17+25 mm on 11-17/18 (56.22 ft at 00Z); forecast p50 56.05 → peak 56.24 (11-23) → 55.75 (11-27), all normal
+  category; NWM short-range h1 → 55.57 ft logged alongside. Partial IV mean for 11-21 already 56.09 → our h1
+  likely ~0.05–0.07 ft low (steady rise under-forecast; S-61 releases ramping 0.8→2.2 kcfs).
