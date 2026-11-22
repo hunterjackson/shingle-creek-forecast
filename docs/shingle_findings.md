@@ -306,3 +306,29 @@ Morning features: only for h ≤ 3 and trained on the full record (LightGBM `all
   (point forecast with mean+1σ rain): none clearly better on floods (±1 day of 14); wet p90 lifts overall
   coverage at h5–7 to .82–.85 at +0.3–0.9 ft width. Kept the simple |p50−stage|-binned bands. The final
   model's calibration window (2020-10..2023-12) includes Ian.
+
+## 2026-11-21 — FINAL TEST (one shot): 2024-01-01 .. 2026-11-12, 1047 issue days, Milton included
+Config frozen before running: spec.build_model (0.5 ARX + 0.5 RatingHybrid, deep LightGBM, floodplain rating,
+morning features h≤3), GEFS raw h1–3 / per-lead-scaled h4–7, |p50−stage|-binned bands calibrated OOF by year on
+forecast-mode predictions 2020-10..2023-12. Trained on ≤2023-12-31 (GR4J recalibrated ≤2023). Past rain = gridMET
+archive (live runs fill the last 1–2 days with MRMS; checked separately). Script: scratchpad/final_test.py.
+
+| MAE ft | h1 | h2 | h3 | h4 | h5 | h6 | h7 |
+|---|---|---|---|---|---|---|---|
+| persistence | .105 | .189 | .260 | .326 | .385 | .437 | .483 |
+| model, no future rain | .036 | .114 | .180 | .248 | .301 | .346 | .388 |
+| **model + issued GEFS** | **.034** | **.095** | **.141** | **.222** | **.257** | **.290** | **.320** |
+| model + perfect rain (bound) | .033 | .081 | .113 | .142 | .157 | .167 | .174 |
+| ≥59 ft (n=6, Milton) GEFS | .11 | .49 | .62 | 1.66 | 1.55 | 1.33 | .94 |
+| ≥59 ft persistence | .67 | 1.55 | 2.39 | 3.01 | 3.54 | 4.20 | 4.67 |
+| low water (≤52.49) GEFS | .021 | .045 | .064 | .089 | .104 | .118 | .137 |
+| low water persistence | .034 | .060 | .078 | .094 | .111 | .130 | .146 |
+| POD/FAR ≥59, GEFS | 1/0 | 1/0 | .83/0 | .50/.40 | .50/.25 | .67/0 | .67/0 |
+| 80 % band coverage, GEFS | .79 | .79 | .80 | .78 | .79 | .77 | .76 |
+| … on flood days (n=6) | .50 | .33 | .50 | .17 | .17 | .33 | .33 |
+- vs persistence: −68 % (h1), −46 % (h3), −34 % (h7). Real-forecast skill sits ~45 % of the way from the
+  no-rain to the perfect-rain bound at h7.
+- Milton (crest 60.56 ft daily mean 2024-10-13): peak error h1 −0.16 (on time), h3 −0.15 (1 d early),
+  h4–h7 **over** by +0.9…+1.6 ft (GEFS had big Milton totals; ×1.35–1.45 scale amplified them); perfect
+  rain −0.2…−0.7. Flood-day band coverage is poor (6 days) → bands under-represent storm-forecast risk.
+- Low water: clearly better than persistence at h1–h3; only marginally at h5–h7 (.104–.137 vs .111–.146).
