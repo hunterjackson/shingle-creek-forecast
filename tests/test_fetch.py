@@ -162,3 +162,25 @@ def test_load_history_includes_iv_when_present(tmp_path, fake_sources, monkeypat
     h = fetch.load_history(tmp_path)
 
     assert len(h["iv"]["gauge"]) == 48 and h["iv"]["upstream"] is None
+
+
+def test_fetch_iv_history_retries_and_checkpoints_each_year(tmp_path, monkeypatch):
+    state = {"n": 0}
+
+    def flaky_iv(site, start, end=None, client=None):
+        state["n"] += 1
+        if start.startswith("2022") and state["n"] == 2:
+            raise usgs.httpx.ConnectError("reset")  # first try at 2022 fails, retry works
+        if start.startswith("2023"):
+            raise usgs.httpx.ConnectError("down")  # 2023 never works
+        idx = pd.date_range(pd.Timestamp(start).tz_localize(None), pd.Timestamp(end).tz_localize(None), freq="6h", tz="UTC", name="time")
+        return pd.DataFrame({"discharge_cfs": 100.0, "stage_ft": 55.0}, index=idx)
+
+    monkeypatch.setattr(usgs, "fetch_iv", flaky_iv)
+
+    with pytest.raises(usgs.httpx.ConnectError):
+        fetch.fetch_iv_history(tmp_path, sites=("A",), start="2021-06-01", today="2023-03-10", retries=2, retry_wait=0)
+
+    # years completed before the failure are on disk -> a rerun resumes from there
+    df = pd.read_parquet(tmp_path / "usgs_iv_A.parquet")
+    assert df.index.max() >= pd.Timestamp("2022-12-31", tz="UTC")
