@@ -56,3 +56,31 @@ def test_cli_routes_train_and_predict(monkeypatch, tmp_path):
     cli.main(["predict", "--data-dir", str(tmp_path), "--no-update"])
 
     assert seen == [("train", "2023-12-31"), ("predict", False)]
+
+
+def test_nwm_stage_h1_converts_short_range_flow_for_the_next_local_day():
+    import json
+    from pathlib import Path
+
+    from home_display.shingle import rating
+    from home_display.shingle.sources import nwm
+
+    payload = json.loads((Path(__file__).parent / "fixtures" / "nwm_short_range.json").read_text())
+    df = nwm.parse_streamflow(payload)
+    day1 = nwm.daily_mean(df).index[0]
+    r = rating.CombinedRating(c=1e-5, d=1.0, h0=47.0, a=0.5, b=0.43, k=1.0)
+
+    st = pipeline.nwm_stage_h1(r, issue_day=day1 - pd.Timedelta(days=1), toho=54.0, fetch=lambda: df)
+
+    q = nwm.daily_mean(df).loc[day1]
+    assert st == pytest.approx(float(r.predict_stage([q], [54.0])[0]))
+    assert pipeline.nwm_stage_h1(r, issue_day=day1 + pd.Timedelta(days=5), toho=54.0, fetch=lambda: df) is None
+    assert pipeline.nwm_stage_h1(r, issue_day=day1, toho=54.0, fetch=lambda: (_ for _ in ()).throw(RuntimeError("down"))) is None
+
+
+def test_cli_score_prints_table(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(pipeline, "score_from_disk", lambda data_dir, log: pd.DataFrame({"n": [3], "mae": [0.1]}, index=pd.Index([1], name="h")))
+
+    cli.main(["score", "--data-dir", str(tmp_path)])
+
+    assert "mae" in capsys.readouterr().out

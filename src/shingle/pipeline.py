@@ -7,12 +7,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import basin, config, fcst, fetch, grid, live, output, train
+from home_display.shingle import basin, config, fcst, fetch, forecast_log, grid, live, output, train
 from home_display.shingle.sources import gefs, gridmet
 
 ISSUE_READY_UTC = pd.Timedelta(hours=13)  # 12Z readings + MRMS 12Z QPE (~1 h latency) are in by ~13Z
 MODEL_PATH = config.MODELS_DIR / "shingle.pkl"
 OUT_PATH = config.OUT_DIR / "shingle.json"
+LOG_PATH = config.OUT_DIR / "forecast_log.csv"
 
 
 def latest_issue_day(now: pd.Timestamp | None = None) -> pd.Timestamp:
@@ -94,7 +95,7 @@ def train_from_disk(data_dir: Path, model_path: Path, train_end: str) -> train.A
     return art
 
 
-def predict_from_disk(data_dir: Path, model_path: Path, out_path: Path, update: bool = True, now=None) -> dict:
+def predict_from_disk(data_dir: Path, model_path: Path, out_path: Path, update: bool = True, now=None, log_path: Path = LOG_PATH) -> dict:
     if update:
         update_inputs(data_dir)
     art = train.load(model_path)
@@ -104,4 +105,29 @@ def predict_from_disk(data_dir: Path, model_path: Path, out_path: Path, update: 
     iv = hist["iv"]["gauge"]
     last = iv["stage_ft"].dropna()
     current = (float(last.iloc[-1]), last.index[-1]) if len(last) else (float("nan"), pd.Timestamp.now(tz="UTC"))
-    return forecast_doc(art, hist, raw, src, radar, latest_issue_day(now), out_path, current)
+    issue = latest_issue_day(now)
+    doc = forecast_doc(art, hist, raw, src, radar, issue, out_path, current)
+    toho = hist["lakes"]["toho_stage"].dropna()
+    nwm_h1 = nwm_stage_h1(art.model.b.rating, issue, float(toho.iloc[-1]) if len(toho) else float("nan"))
+    forecast_log.append(log_path, doc, nwm_h1)
+    return doc
+
+
+def score_from_disk(data_dir: Path, log_path: Path = LOG_PATH) -> pd.DataFrame:
+    hist = fetch.load_history(data_dir)
+    return forecast_log.score(log_path, hist["gauge"]["stage_ft"])
+
+
+def nwm_stage_h1(rating, issue_day, toho: float, fetch=None) -> float | None:
+    """NWM short-range mean flow for local day t+1 -> stage through our rating (None if unavailable)."""
+    from home_display.shingle.sources import nwm
+
+    day1 = pd.Timestamp(issue_day).normalize() + pd.Timedelta(days=1)
+    try:
+        df = fetch() if fetch else nwm.fetch_streamflow(config.NWM_REACH, "short_range")
+        q = nwm.daily_mean(df)
+    except Exception:  # NWPS outages must not break the morning forecast
+        return None
+    if day1 not in q.index or pd.isna(toho):
+        return None
+    return float(rating.predict_stage([float(q.loc[day1])], [float(toho)])[0])

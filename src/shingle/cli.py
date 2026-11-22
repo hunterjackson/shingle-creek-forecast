@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> None:
     p_pred.add_argument("--out", type=Path, default=pipeline.OUT_PATH)
     p_pred.add_argument("--no-update", action="store_true", help="use cached inputs only")
 
+    p_score = sub.add_parser("score", help="verify logged forecasts (ours vs NWM) against observed stage")
+    p_score.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
+    p_score.add_argument("--log", type=Path, default=pipeline.LOG_PATH)
+
     args = parser.parse_args(argv)
     if args.cmd == "fetch":
         fetch.fetch_history(args.data_dir, refresh=args.refresh)
@@ -37,3 +41,5 @@ def main(argv: list[str] | None = None) -> None:
         pipeline.train_from_disk(args.data_dir, args.model, end)
     elif args.cmd == "predict":
         pipeline.predict_from_disk(args.data_dir, args.model, args.out, update=not args.no_update)
+    elif args.cmd == "score":
+        print(pipeline.score_from_disk(args.data_dir, args.log).round(3).to_string())
