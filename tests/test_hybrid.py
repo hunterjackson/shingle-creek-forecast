@@ -118,3 +118,22 @@ def test_bands_widen_when_a_big_change_is_predicted(data):
     big = change > change.quantile(0.9)
     small = change < change.quantile(0.5)
     assert width[big].mean() > 1.5 * width[small].mean()
+
+
+def test_hybrid_passes_rating_options_to_fit(data, monkeypatch):
+    from home_display.shingle import rating as rating_mod
+
+    seen = {}
+    real = rating_mod.fit_combined
+
+    def spy(q, stage, lake, **kw):
+        seen.update(kw)
+        return real(q, stage, lake, **kw)
+
+    monkeypatch.setattr(rating_mod, "fit_combined", spy)
+    m = make((1,))
+    m.rating_opts = {"floodplain": True, "d_max": 1.2, "g_min": 0.3}
+    m.fit(data, data["stage"].index[:1500])
+
+    assert seen == {"floodplain": True, "d_max": 1.2, "g_min": 0.3}
+    assert m.rating.qb is not None

@@ -52,9 +52,17 @@ def _smoothmax(a, b, k):
     return np.maximum(a, b) + np.log1p(np.exp(-k * np.abs(a - b))) / k
 
 
+FLOODPLAIN_WIDTH = 0.25  # width (log-Q units) of the smooth transition at the floodplain break
+
+
 @dataclass(frozen=True)
 class CombinedRating:
-    """Smooth max of lake control (lake + c*Q^d) and channel control (h0 + a*Q^b)."""
+    """Smooth max of lake control (lake + c*Q^d) and channel control (h0 + a*Qe^b).
+
+    Optional floodplain break (qb, g): above qb the channel's effective flow
+    grows only as Q^g (g < 1) -- water spreads over the floodplain, so stage
+    rises more slowly. Qe = Q below the break; smooth transition in log Q.
+    """
 
     c: float
     d: float
@@ -62,11 +70,20 @@ class CombinedRating:
     a: float
     b: float
     k: float
+    qb: float | None = None
+    g: float = 1.0
+
+    def _effective_q(self, q: np.ndarray) -> np.ndarray:
+        if self.qb is None:
+            return q
+        lq = np.log(np.clip(q, 1e-6, None))
+        w = FLOODPLAIN_WIDTH
+        return np.exp(lq - (1 - self.g) * w * np.logaddexp(0, (lq - np.log(self.qb)) / w))
 
     def predict_stage(self, q: np.ndarray, lake: np.ndarray) -> np.ndarray:
         q = np.clip(np.asarray(q, float), 0, None)
         lake_ctrl = np.asarray(lake, float) + self.c * q**self.d
-        chan_ctrl = self.h0 + self.a * q**self.b
+        chan_ctrl = self.h0 + self.a * self._effective_q(q) ** self.b
         return _smoothmax(lake_ctrl, chan_ctrl, self.k)
 
     def predict_flow(self, stage: np.ndarray, lake: np.ndarray, q_max: float = 1e5) -> np.ndarray:
@@ -111,18 +128,50 @@ def fit_backwater(q, stage, lake) -> BackwaterRating:
     return BackwaterRating(float(c), float(d))
 
 
-def fit_combined(q, stage, lake) -> CombinedRating:
+def fit_combined(q, stage, lake, floodplain: bool = False, d_max: float = 3.0, g_min: float = 0.05) -> CombinedRating:
+    """Least-squares fit of CombinedRating.
+
+    floodplain=True adds the (qb, g) break. d_max caps the lake-control
+    exponent and g_min the floodplain flattening: with few flood days the
+    unconstrained fit lets lake + c*Q^d (d~1.5) take over above the record and
+    explode, or flattens the channel to a cap; the bounds keep extrapolation
+    monotone and gentle.
+    """
     q, stage, lake = _finite(np.asarray(q, float), np.asarray(stage, float), np.asarray(lake, float))
     bw = fit_backwater(q, stage, lake)
     hi = q >= np.quantile(q, 0.8)
     fr = fit_free(q[hi], stage[hi]) if hi.sum() > 10 else fit_free(q, stage)
 
-    def f(x, c, d, h0, a, b, k):
-        return CombinedRating(c, d, h0, a, b, k).predict_stage(x[0], x[1])
-
-    p0 = [bw.c, bw.d, fr.h0, fr.a, fr.b, 5.0]
     lower = [1e-7, 0.05, 30.0, 1e-6, 0.05, 0.5]
-    upper = [10.0, 3.0, 70.0, 10.0, 2.0, 50.0]
-    p0 = list(np.clip(p0, np.array(lower) + 1e-9, np.array(upper) - 1e-9))
-    params, _ = curve_fit(f, np.vstack([q, lake]), stage, p0=p0, bounds=(lower, upper), maxfev=50000)
-    return CombinedRating(*(float(v) for v in params))
+    upper = [10.0, d_max, 70.0, 10.0, 2.0, 50.0]
+    p0 = [bw.c, bw.d, fr.h0, fr.a, fr.b, 5.0]
+    if floodplain:
+        def f(x, c, d, h0, a, b, k, lqb, g):
+            return CombinedRating(c, d, h0, a, b, k, float(np.exp(lqb)), g).predict_stage(x[0], x[1])
+
+        lower += [np.log(np.quantile(q, 0.5)), g_min]
+        upper += [np.log(q.max() * 3), 1.0]
+        p0 += [np.log(np.quantile(q, 0.99)), max(0.6, g_min)]
+    else:
+        def f(x, c, d, h0, a, b, k):
+            return CombinedRating(c, d, h0, a, b, k).predict_stage(x[0], x[1])
+
+    # multi-start: the free-rating initial guess can land on its bounds and stall the fit
+    generic = [1e-3, 1.0, float(np.min(stage)) - 2.0, 0.3, 0.45, 5.0] + p0[6:]
+    X = np.vstack([q, lake])
+    best, best_sse = None, np.inf
+    for start in (p0, generic):
+        start = list(np.clip(start, np.array(lower) + 1e-9, np.array(upper) - 1e-9))
+        try:
+            cand, _ = curve_fit(f, X, stage, p0=start, bounds=(lower, upper), maxfev=100000)
+        except RuntimeError:
+            continue
+        sse = float(((f(X, *cand) - stage) ** 2).sum())
+        if sse < best_sse:
+            best, best_sse = cand, sse
+    if best is None:
+        raise RuntimeError("combined rating fit failed from every start")
+    params = [float(v) for v in best]
+    if floodplain:
+        params[6] = float(np.exp(params[6]))
+    return CombinedRating(*params)

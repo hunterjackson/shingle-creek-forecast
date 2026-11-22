@@ -83,3 +83,46 @@ def test_combined_rating_round_trip_dict():
     r = rating.CombinedRating(c=0.001, d=1.0, h0=50.0, a=0.3, b=0.45, k=8.0)
 
     assert rating.from_dict(r.to_dict()) == r
+
+
+def test_floodplain_flattens_channel_control_above_break():
+    plain = rating.CombinedRating(c=1e-5, d=1.0, h0=50.0, a=0.3, b=0.45, k=8.0)
+    fp = rating.CombinedRating(c=1e-5, d=1.0, h0=50.0, a=0.3, b=0.45, k=8.0, qb=2000.0, g=0.3)
+    lake = np.array([52.0])
+
+    # well below the break: identical
+    assert fp.predict_stage(np.array([200.0]), lake)[0] == pytest.approx(plain.predict_stage(np.array([200.0]), lake)[0], abs=0.02)
+    # far above: rises, but much less steeply than the unbroken power law
+    s = [fp.predict_stage(np.array([q]), lake)[0] for q in (4000.0, 8000.0)]
+    p = [plain.predict_stage(np.array([q]), lake)[0] for q in (4000.0, 8000.0)]
+    assert s[1] > s[0]
+    assert (s[1] - s[0]) < 0.6 * (p[1] - p[0])
+    # inverse still consistent
+    st = fp.predict_stage(np.array([5000.0]), lake)
+    assert fp.predict_flow(st, lake)[0] == pytest.approx(5000.0, rel=0.02)
+
+
+def test_fit_combined_floodplain_learns_flattening_and_bounds_lake_exponent(rng):
+    n = 5000
+    q = np.exp(rng.uniform(np.log(5), np.log(4000), n))
+    lake = rng.uniform(51.5, 56.0, n)
+    truth = rating.CombinedRating(c=2e-4, d=1.0, h0=50.0, a=0.3, b=0.45, k=8.0, qb=1500.0, g=0.3)
+    stage = truth.predict_stage(q, lake) + rng.normal(0, 0.03, n)
+
+    plain = rating.fit_combined(q, stage, lake)
+    fp = rating.fit_combined(q, stage, lake, floodplain=True, d_max=1.2, g_min=0.3)
+
+    top = q > 2500
+    err_plain = np.abs(plain.predict_stage(q[top], lake[top]) - stage[top]).mean()
+    err_fp = np.abs(fp.predict_stage(q[top], lake[top]) - stage[top]).mean()
+    assert err_fp < 0.5 * err_plain
+    assert fp.d <= 1.2 + 1e-9 and fp.g >= 0.3 - 1e-9
+    # extrapolation stays monotone and gentle
+    ext = fp.predict_stage(np.array([4000.0, 8000.0, 16000.0]), np.full(3, 56.0))
+    assert np.all(np.diff(ext) > 0) and ext[-1] - ext[0] < 5.0
+
+
+def test_floodplain_rating_round_trip_dict():
+    r = rating.CombinedRating(c=0.001, d=1.0, h0=50.0, a=0.3, b=0.45, k=8.0, qb=2500.0, g=0.4)
+
+    assert rating.from_dict(r.to_dict()) == r
