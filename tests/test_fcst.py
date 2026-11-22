@@ -64,3 +64,17 @@ def test_fit_scale_matches_mean_of_observed_per_lead(setup):
         ob = obs["g1"].shift(-k).iloc[:300]
         ok = fc.notna() & ob.notna()
         assert scale[k] == pytest.approx(ob[ok].sum() / fc[ok].sum())
+
+
+def test_build_mixed_scales_only_long_horizons(setup):
+    data, raw, src, tgt, drv = setup
+    scale = {1: 2.0, 2: 2.0, 3: 2.0}
+
+    f = fcst.build_mixed(raw, src, tgt, drv, data, scale=scale, scaled_from_h=2, horizons=(1, 2, 3))
+    plain = fcst.build(raw, src, tgt, drv, data)
+    scaled = fcst.build(raw, src, tgt, drv, data, scale=scale)
+
+    pd.testing.assert_frame_equal(f["pr"], plain["pr"])
+    assert set(f["by_h"]) == {2, 3}
+    pd.testing.assert_frame_equal(f["by_h"][3]["pr"], scaled["pr"])
+    pd.testing.assert_frame_equal(f["by_h"][2]["gr4j_q"], scaled["gr4j_q"])

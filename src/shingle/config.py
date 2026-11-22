@@ -27,3 +27,7 @@ OUT_DIR = Path("out")
 TRAIN_END = "2021-12-31"
 VAL_END = "2023-12-31"
 MRMS_START = "2018-06-30"
+
+# gridMET cell (just NE of the gauge) picked first by partial-correlation selection at every
+# horizon (docs/shingle_findings.md, 2026-11-20); the models' rain inputs come from it.
+RAIN_CELL = "28.2750_-81.4333"

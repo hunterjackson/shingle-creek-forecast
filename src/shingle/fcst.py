@@ -42,3 +42,11 @@ def fit_scale(mapped: pd.DataFrame, obs: pd.DataFrame, cell: str, index: pd.Date
         ok = fc.notna() & ob.notna()
         out[k] = float(ob[ok].sum() / fc[ok].sum()) if fc[ok].sum() > 0 else 1.0
     return out
+
+
+def build_mixed(raw, src_cells, tgt_cells, driver, data: dict, scale: dict, scaled_from_h: int = 4, horizons=tuple(range(1, 8))) -> dict:
+    """Raw forecasts for short horizons, per-lead-scaled forecasts for horizons >= scaled_from_h
+    (val 2022-23: raw GEFS best for h1-3, scaled for h4-7)."""
+    plain = build(raw, src_cells, tgt_cells, driver, data)
+    scaled = build(raw, src_cells, tgt_cells, driver, data, scale=scale)
+    return dict(plain, by_h={h: scaled for h in horizons if h >= scaled_from_h})
