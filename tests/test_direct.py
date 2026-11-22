@@ -109,3 +109,18 @@ def test_allow_missing_keeps_rows_with_nan_in_listed_features_for_lgbm(data):
 def test_allow_missing_rejected_for_ridge(data):
     with pytest.raises(ValueError):
         direct.DirectRegressor("log_q", ["log_q"], (1,), backend="ridge", allow_missing=["log_q"])
+
+
+def test_lgbm_params_and_monotone_constraints_pass_through(data):
+    idx = data["q"].index
+    feats = ["log_q", "pr_nextH__c"]
+    m = direct.DirectRegressor("log_q", feats, (1,), backend="lgbm", lgbm_params={"n_estimators": 50, "num_leaves": 7},
+                               monotone={"pr_nextH__c": 1}).fit(data, idx[:2000])
+
+    est = m.models[1]
+    assert est.get_params()["n_estimators"] == 50 and est.get_params()["num_leaves"] == 7
+    assert est.get_params()["monotone_constraints"] == [0, 1]
+    # more forecast rain never lowers the predicted flow
+    d2 = dict(data, pr=data["pr"] * 3)
+    p1, p2 = m.predict(data, idx[2000:2400])["h1"], m.predict(d2, idx[2000:2400])["h1"]
+    assert (p2 >= p1 - 1e-9).all()

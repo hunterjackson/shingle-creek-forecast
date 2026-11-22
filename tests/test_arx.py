@@ -85,3 +85,8 @@ def test_arx_bands_are_state_dependent(data):
 def test_arx_passes_allow_missing_to_regressor(data):
     m = arx.ARX(features=FEATS, horizons=(1,), backend="lgbm", allow_missing=["dstage_1"])
     assert m.reg.allow_missing == {"dstage_1"}
+
+
+def test_arx_passes_lgbm_params_and_monotone(data):
+    m = arx.ARX(features=FEATS, horizons=(1,), backend="lgbm", lgbm_params={"num_leaves": 7}, monotone={FEATS[2]: 1})
+    assert m.reg.lgbm_params == {"num_leaves": 7} and m.reg.monotone == {FEATS[2]: 1}
