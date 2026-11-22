@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import evaluate
-from home_display.shingle.models import arx, base, corrector
+from shingle import evaluate
+from shingle.models import arx, base, corrector
 
 
 @pytest.fixture

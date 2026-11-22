@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from home_display.shingle import cli, fetch
+from shingle import cli, fetch
 
 
 def test_fetch_subcommand_calls_fetch_history(monkeypatch, tmp_path):

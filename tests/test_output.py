@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-from home_display.shingle import output
+from shingle import output
 
 
 @pytest.mark.parametrize("stage,cat", [(55.0, "normal"), (58.99, "normal"), (59.0, "action"), (60.2, "minor"), (61.0, "moderate"), (64.2, "major"), (float("nan"), "unknown")])

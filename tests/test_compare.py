@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import compare, evaluate
-from home_display.shingle.models import baseline
+from shingle import compare, evaluate
+from shingle.models import baseline
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ class FromX:
 
 
 def test_score_models_eval_data_used_for_prediction_and_calibration(data):
-    from home_display.shingle.models.base import ConformalBandsMixin
+    from shingle.models.base import ConformalBandsMixin
 
     class M(FromX, ConformalBandsMixin):
         pass

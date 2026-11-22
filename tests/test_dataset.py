@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import dataset
+from shingle import dataset
 
 
 def test_build_data_maps_history_to_model_inputs():

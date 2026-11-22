@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import respx
 
-from home_display.shingle.sources import usgs
+from shingle.sources import usgs
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

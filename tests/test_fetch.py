@@ -4,8 +4,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from home_display.shingle import config, fetch
-from home_display.shingle.sources import dbhydro, gridmet, nldi, usgs
+from shingle import config, fetch
+from shingle.sources import dbhydro, gridmet, nldi, usgs
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -85,7 +85,7 @@ def test_dbhydro_requested_in_one_call_with_all_keys(tmp_path, fake_sources):
 
 
 def test_fetch_nwm_retro_writes_parquet_once(tmp_path, monkeypatch):
-    from home_display.shingle.sources import nwm_retro
+    from shingle.sources import nwm_retro
 
     calls = []
 
@@ -104,7 +104,7 @@ def test_fetch_nwm_retro_writes_parquet_once(tmp_path, monkeypatch):
 
 
 def test_fetch_mrms_history_checkpoints_by_month_and_skips_complete_months(tmp_path, monkeypatch):
-    from home_display.shingle.sources import mrms
+    from shingle.sources import mrms
 
     calls = []
 
@@ -187,7 +187,7 @@ def test_fetch_iv_history_retries_and_checkpoints_each_year(tmp_path, monkeypatc
 
 
 def test_fetch_gefs_history_writes_monthly_files_and_skips_complete(tmp_path, monkeypatch):
-    from home_display.shingle.sources import gefs
+    from shingle.sources import gefs
 
     calls = []
 
@@ -212,7 +212,7 @@ def test_fetch_gefs_history_writes_monthly_files_and_skips_complete(tmp_path, mo
 
 
 def test_fetch_mrms_history_12z_goes_to_own_dir(tmp_path, monkeypatch):
-    from home_display.shingle.sources import mrms
+    from shingle.sources import mrms
 
     seen = []
 

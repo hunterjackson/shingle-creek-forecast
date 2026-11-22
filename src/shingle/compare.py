@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from home_display.shingle import config, evaluate
-from home_display.shingle.models.base import targets
+from shingle import config, evaluate
+from shingle.models.base import targets
 
 
 def score_models(

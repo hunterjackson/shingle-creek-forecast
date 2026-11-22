@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from home_display.shingle.sources.gridmet import cells_from_columns
+from shingle.sources.gridmet import cells_from_columns
 
 
 def aggregate_blocks(df: pd.DataFrame, factor: int, res: float = 0.01) -> pd.DataFrame:

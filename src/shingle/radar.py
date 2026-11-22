@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from home_display.shingle import analysis
-from home_display.shingle.sources.gridmet import cells_from_columns
+from shingle import analysis
+from shingle.sources.gridmet import cells_from_columns
 
 
 def build_regions(blocks: pd.DataFrame, train_end: str, threshold: float = 0.85, window: int = 3) -> pd.Series:

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import live
+from shingle import live
 
 
 def test_daily_from_iv_uses_local_standard_time_days_and_requires_coverage():

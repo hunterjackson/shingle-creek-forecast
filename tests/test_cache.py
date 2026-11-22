@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from home_display.shingle import cache
+from shingle import cache
 
 
 def daily(start, end, value):

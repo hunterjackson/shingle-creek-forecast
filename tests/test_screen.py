@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import screen
+from shingle import screen
 
 
 def idx(n, start="2000-01-01"):

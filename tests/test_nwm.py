@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 import respx
 
-from home_display.shingle.sources import nwm
+from shingle.sources import nwm
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

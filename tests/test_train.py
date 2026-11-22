@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import dataset, train
-from home_display.shingle.models import base
+from shingle import dataset, train
+from shingle.models import base
 
 from synth import make_world
 

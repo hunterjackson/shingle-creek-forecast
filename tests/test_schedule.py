@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from home_display.shingle import schedule
+from shingle import schedule
 
 
 @pytest.mark.parametrize(

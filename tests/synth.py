@@ -3,8 +3,8 @@
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import config
-from home_display.shingle.sources import gridmet
+from shingle import config
+from shingle.sources import gridmet
 
 
 def make_world(n_days: int = 4 * 365, start: str = "2018-01-01", seed: int = 0):

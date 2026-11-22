@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from home_display.shingle.sources import nwm_retro
+from shingle.sources import nwm_retro
 
 
 @pytest.fixture

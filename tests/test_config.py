@@ -1,6 +1,6 @@
 import pandas as pd
 
-from home_display.shingle import config
+from shingle import config
 
 
 def test_split_dates_ordered_and_match_decision():

@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import respx
 
-from home_display.shingle.sources import dbhydro
+from shingle.sources import dbhydro
 
 FIXTURES = Path(__file__).parent / "fixtures"
 URL = "https://insightsdata.api.sfwmd.gov/v1/insights-data/cont/data"

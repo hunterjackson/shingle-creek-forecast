@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle.models import base, baseline
+from shingle.models import base, baseline
 
 
 @pytest.fixture

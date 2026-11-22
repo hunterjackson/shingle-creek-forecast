@@ -8,9 +8,9 @@ Morning (issue-time) readings only for h <= 3 and allowed missing (exist from 20
 
 from __future__ import annotations
 
-from home_display.shingle import config
-from home_display.shingle.models import arx, blend, direct, hybrid
-from home_display.shingle.models.base import HORIZONS
+from shingle import config
+from shingle.models import arx, blend, direct, hybrid
+from shingle.models.base import HORIZONS
 
 LGBM_PARAMS = {"n_estimators": 300, "learning_rate": 0.05, "num_leaves": 63, "min_child_samples": 20}
 RATING_OPTS = {"floodplain": True, "d_max": 1.2, "g_min": 0.3}

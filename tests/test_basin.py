@@ -7,8 +7,8 @@ import pytest
 import respx
 from shapely.geometry import Polygon, box
 
-from home_display.shingle.sources import nldi
-from home_display.shingle import basin
+from shingle.sources import nldi
+from shingle import basin
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

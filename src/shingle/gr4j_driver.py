@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from home_display.shingle.models import gr4j
+from shingle.models import gr4j
 
 
 def areal(df: pd.DataFrame, weights: dict[str, float]) -> pd.Series:

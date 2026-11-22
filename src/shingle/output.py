@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from home_display.shingle import config
+from shingle import config
 
 _ORDER = ("major", "moderate", "minor", "action")
 

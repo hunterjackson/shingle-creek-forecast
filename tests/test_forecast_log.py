@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from home_display.shingle import forecast_log
+from shingle import forecast_log
 
 
 def doc(issue, p50s):

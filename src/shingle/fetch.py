@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from home_display.shingle import basin as basin_mod
-from home_display.shingle import cache, config
-from home_display.shingle.sources import dbhydro, gridmet, nldi, usgs
+from shingle import basin as basin_mod
+from shingle import cache, config
+from shingle.sources import dbhydro, gridmet, nldi, usgs
 
 
 def fetch_history(data_dir: Path, today: str | None = None, start: str = config.HISTORY_START, refresh: bool = False) -> None:
@@ -65,7 +65,7 @@ def load_history(data_dir: Path) -> dict:
 
 def fetch_nwm_retro(data_dir: Path, start: str = "1979-02-02", end: str = "2023-01-31", refresh: bool = False) -> pd.DataFrame:
     """One-off pull of the NWM v3 retrospective daily flow for our reach (~3.5 GB of chunk reads)."""
-    from home_display.shingle.sources import nwm_retro
+    from shingle.sources import nwm_retro
 
     path = Path(data_dir) / "nwm_retro.parquet"
     if path.exists() and not refresh:
@@ -87,7 +87,7 @@ def fetch_mrms_history(data_dir: Path, start: str | None = None, today: str | No
     A month file is considered final once its last day is >= 5 days before
     `today`; otherwise it is re-fetched (latest days get revised / filled in).
     """
-    from home_display.shingle.sources import mrms
+    from shingle.sources import mrms
 
     out = _mrms_dir(data_dir, hour)
     out.mkdir(parents=True, exist_ok=True)
@@ -175,7 +175,7 @@ def fetch_gefs_history(
 
     import httpx
 
-    from home_display.shingle.sources import gefs
+    from shingle.sources import gefs
 
     today_ts = pd.Timestamp(today) if today else pd.Timestamp.today().normalize()
     end_ts = pd.Timestamp(end) if end else today_ts

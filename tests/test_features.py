@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import features
+from shingle import features
 
 CELL = "28.0000_-81.0000"
 CELL2 = "28.0417_-81.0000"
@@ -108,7 +108,7 @@ def lake_data(data):
 
 
 def test_lake_features(lake_data):
-    from home_display.shingle import schedule
+    from shingle import schedule
 
     names = ["toho", "dtoho_3", "toho_dev", "toho_target_dH", "log_s61", "log_s59", "etoho", "log_q_d1"]
     X = features.build(lake_data, names, horizon=5)
@@ -139,7 +139,7 @@ def test_lake_features_no_lookahead(lake_data):
 
 
 def test_gr4j_features(data):
-    from home_display.shingle.models import gr4j
+    from shingle.models import gr4j
 
     d = dict(data)
     d["gr4j"] = pd.DataFrame(

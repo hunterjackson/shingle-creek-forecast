@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import basin, config, fcst, fetch, forecast_log, grid, live, output, train
-from home_display.shingle.sources import gefs, gridmet
+from shingle import basin, config, fcst, fetch, forecast_log, grid, live, output, train
+from shingle.sources import gefs, gridmet
 
 ISSUE_READY_UTC = pd.Timedelta(hours=13)  # 12Z readings + MRMS 12Z QPE (~1 h latency) are in by ~13Z
 MODEL_PATH = config.MODELS_DIR / "shingle.pkl"
@@ -120,7 +120,7 @@ def score_from_disk(data_dir: Path, log_path: Path = LOG_PATH) -> pd.DataFrame:
 
 def nwm_stage_h1(rating, issue_day, toho: float, fetch=None) -> float | None:
     """NWM short-range mean flow for local day t+1 -> stage through our rating (None if unavailable)."""
-    from home_display.shingle.sources import nwm
+    from shingle.sources import nwm
 
     day1 = pd.Timestamp(issue_day).normalize() + pd.Timedelta(days=1)
     try:

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import respx
 
-from home_display.shingle.sources import gridmet
+from shingle.sources import gridmet
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BBOX = gridmet.BBox(north=28.62, south=28.18, west=-81.60, east=-81.30)

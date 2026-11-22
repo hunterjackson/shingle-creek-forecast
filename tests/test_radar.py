@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import radar
+from shingle import radar
 
 
 def test_build_regions_clusters_correlated_cells_using_train_period_only():

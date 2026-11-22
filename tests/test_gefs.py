@@ -6,8 +6,8 @@ import pandas as pd
 import pytest
 import respx
 
-from home_display.shingle.sources import gefs
-from home_display.shingle.sources.gridmet import BBox
+from shingle.sources import gefs
+from shingle.sources.gridmet import BBox
 
 FIXTURES = Path(__file__).parent / "fixtures"
 RUN = pd.Timestamp("2022-09-26 00:00")

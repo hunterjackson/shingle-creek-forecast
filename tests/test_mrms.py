@@ -7,8 +7,8 @@ import pytest
 import respx
 import xarray as xr
 
-from home_display.shingle.sources import mrms
-from home_display.shingle.sources.gridmet import BBox
+from shingle.sources import mrms
+from shingle.sources.gridmet import BBox
 
 BBOX = BBox(north=28.62, south=28.18, west=-81.60, east=-81.30)
 

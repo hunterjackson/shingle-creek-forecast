@@ -17,7 +17,7 @@ import httpx
 import numpy as np
 import pandas as pd
 
-from home_display.shingle.sources.gridmet import BBox
+from shingle.sources.gridmet import BBox
 
 BASE = "https://noaa-gefs-pds.s3.amazonaws.com"
 V12_START = pd.Timestamp("2020-09-24")  # GEFSv12 (atmos/pgrb2ap5 layout, ensemble mean files)

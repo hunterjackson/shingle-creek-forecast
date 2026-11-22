@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import grid
+from shingle import grid
 
 
 def pix(lats, lons):

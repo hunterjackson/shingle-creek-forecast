@@ -1,5 +1,5 @@
-from home_display.shingle import config, spec
-from home_display.shingle.models import arx, blend, hybrid
+from shingle import config, spec
+from shingle.models import arx, blend, hybrid
 
 
 def test_build_model_is_blend_of_arx_and_rating_hybrid():

@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import evaluate, rating
-from home_display.shingle.models import base, direct, hybrid
+from shingle import evaluate, rating
+from shingle.models import base, direct, hybrid
 
 TRUE_RATING = rating.CombinedRating(c=3e-5, d=1.5, h0=47.7, a=0.42, b=0.46, k=1.0)
 
@@ -49,7 +49,7 @@ def test_hybrid_fits_rating_and_outputs_forecast_columns(data):
 
 
 def test_hybrid_beats_persistence_on_stage(data):
-    from home_display.shingle.models import baseline
+    from shingle.models import baseline
 
     idx = data["stage"].index
     sp = evaluate.time_split(idx, "2005-12-31", "2006-12-31", gap_days=7)
@@ -121,7 +121,7 @@ def test_bands_widen_when_a_big_change_is_predicted(data):
 
 
 def test_hybrid_passes_rating_options_to_fit(data, monkeypatch):
-    from home_display.shingle import rating as rating_mod
+    from shingle import rating as rating_mod
 
     seen = {}
     real = rating_mod.fit_combined

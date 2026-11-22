@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from home_display.shingle import grid
+from shingle import grid
 
 
 def build(raw: pd.DataFrame, src_cells: pd.DataFrame, tgt_cells: pd.DataFrame, driver, data: dict, scale: dict | None = None) -> dict:

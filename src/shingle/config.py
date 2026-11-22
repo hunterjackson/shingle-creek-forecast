@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from home_display.shingle.sources.gridmet import BBox
+from shingle.sources.gridmet import BBox
 
 SITE = "02264495"  # USGS Shingle Creek at Campbell, FL (NWS SHIF1)
 UPSTREAM_SITE = "02263800"  # USGS Shingle Creek at Airport nr Kissimmee (NWS SNCF1)

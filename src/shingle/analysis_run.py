@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import analysis
+from shingle import analysis
 
 PAST_WINDOWS = (1, 3, 7, 14, 30, 60)
 WB_WINDOWS = (30, 90)

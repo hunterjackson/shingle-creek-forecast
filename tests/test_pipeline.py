@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-from home_display.shingle import cli, pipeline, train
+from shingle import cli, pipeline, train
 
 from synth import make_world
 
@@ -62,8 +62,8 @@ def test_nwm_stage_h1_converts_short_range_flow_for_the_next_local_day():
     import json
     from pathlib import Path
 
-    from home_display.shingle import rating
-    from home_display.shingle.sources import nwm
+    from shingle import rating
+    from shingle.sources import nwm
 
     payload = json.loads((Path(__file__).parent / "fixtures" / "nwm_short_range.json").read_text())
     df = nwm.parse_streamflow(payload)

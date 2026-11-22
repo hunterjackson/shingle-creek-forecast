@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from home_display.shingle import config, dataset, fcst, gr4j_driver, live, spec
-from home_display.shingle.evaluate import BinnedConformal
-from home_display.shingle.models.base import HORIZONS, targets
+from shingle import config, dataset, fcst, gr4j_driver, live, spec
+from shingle.evaluate import BinnedConformal
+from shingle.models.base import HORIZONS, targets
 
 SCALED_FROM_H = 4
 

@@ -35,7 +35,7 @@ import re
 import numpy as np
 import pandas as pd
 
-from home_display.shingle import analysis, schedule
+from shingle import analysis, schedule
 
 _CELL = re.compile(r"^(pr_past|pr_next|wb_past)(\d+|H)__(.+)$")
 _DSTAGE = re.compile(r"^dstage_(\d+)$")

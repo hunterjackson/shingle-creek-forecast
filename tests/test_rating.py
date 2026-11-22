@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import rating
+from shingle import rating
 
 
 @pytest.fixture

@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from home_display.shingle.sources.gridmet import BBox
+from shingle.sources.gridmet import BBox
 
 ARCHIVE = "https://mtarchive.geol.iastate.edu"
 START = pd.Timestamp("2018-06-30")

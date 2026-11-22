@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from home_display.shingle import config, fetch, pipeline
+from shingle import config, fetch, pipeline
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import fcst, gr4j_driver
-from home_display.shingle.models import gr4j
+from shingle import fcst, gr4j_driver
+from shingle.models import gr4j
 
 
 def leads_frame(idx, cells, value_fn):

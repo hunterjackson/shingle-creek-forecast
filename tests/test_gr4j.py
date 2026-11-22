@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from home_display.shingle.models import gr4j
+from shingle.models import gr4j
 
 
 def test_unit_hydrograph_ordinates_sum_to_one():

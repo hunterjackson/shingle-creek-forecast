@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from home_display.shingle import analysis_run
+from shingle import analysis_run
 
 
 def idx(n, start="2000-01-01"):
