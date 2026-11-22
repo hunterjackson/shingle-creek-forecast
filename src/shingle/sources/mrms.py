@@ -27,23 +27,25 @@ MULTISENSOR_START = pd.Timestamp("2020-10-12")
 GAUGECORR_END = pd.Timestamp("2020-10-14")
 
 
-def _url(product: str, stamp: pd.Timestamp) -> str:
+def _url(product: str, stamp: pd.Timestamp, hour: int = 5) -> str:
     return (
         f"{ARCHIVE}/{stamp:%Y/%m/%d}/mrms/ncep/{product}/"
-        f"{product}_00.00_{stamp:%Y%m%d}-050000.grib2.gz"
+        f"{product}_00.00_{stamp:%Y%m%d}-{hour:02d}0000.grib2.gz"
     )
 
 
-def candidate_urls(day: pd.Timestamp) -> list[str]:
+def candidate_urls(day: pd.Timestamp, hour: int = 5) -> list[str]:
+    """24 h QPE ending at `hour` UTC on day+1: hour=5 -> local-standard-time day (USGS dv),
+    hour=12 -> gridMET-style day (12Z..12Z, what the models were trained on)."""
     day = pd.Timestamp(day).normalize()
     if day < START:
         raise ValueError(f"MRMS gauge-corrected daily QPE starts {START.date()}")
     stamp = day + pd.Timedelta(days=1)
     urls = []
     if day >= MULTISENSOR_START:
-        urls.append(_url("MultiSensor_QPE_24H_Pass2", stamp))
+        urls.append(_url("MultiSensor_QPE_24H_Pass2", stamp, hour))
     if day <= GAUGECORR_END or day >= MULTISENSOR_START:
-        urls.append(_url("GaugeCorr_QPE_24H", stamp))
+        urls.append(_url("GaugeCorr_QPE_24H", stamp, hour))
     return urls
 
 
@@ -70,9 +72,9 @@ def crop(da: xr.DataArray, bbox: BBox) -> pd.Series:
     return pd.Series(vals.ravel(), index=pd.Index(ids, name="cell_id"))
 
 
-def fetch_day(day: pd.Timestamp, bbox: BBox, client: httpx.Client | None = None) -> pd.Series | None:
+def fetch_day(day: pd.Timestamp, bbox: BBox, client: httpx.Client | None = None, hour: int = 5) -> pd.Series | None:
     client = client or httpx.Client(timeout=120)
-    for url in candidate_urls(day):
+    for url in candidate_urls(day, hour):
         resp = client.get(url)
         if resp.status_code == 404:
             continue
@@ -83,14 +85,14 @@ def fetch_day(day: pd.Timestamp, bbox: BBox, client: httpx.Client | None = None)
     return None
 
 
-def fetch(start: str, end: str, bbox: BBox, workers: int = 8) -> pd.DataFrame:
+def fetch(start: str, end: str, bbox: BBox, workers: int = 8, hour: int = 5) -> pd.DataFrame:
     days = pd.date_range(start, end, name="date")
     client = httpx.Client(timeout=120, limits=httpx.Limits(max_connections=workers))
 
     def one(day):
         for attempt in range(3):
             try:
-                return fetch_day(day, bbox, client=client)
+                return fetch_day(day, bbox, client=client, hour=hour)
             except (httpx.TransportError, httpx.HTTPStatusError):
                 if attempt == 2:
                     raise
