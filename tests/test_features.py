@@ -193,3 +193,23 @@ def test_forecast_mode_replaces_future_rain_and_gr4j_change(data):
     np.testing.assert_allclose(X["gr4j_dH"], np.log1p(200.0) - np.log1p(50.0))
     # past features untouched by the forecast
     pd.testing.assert_series_equal(X[f"pr_past3__{CELL}"], features.build(data, [f"pr_past3__{CELL}"])[f"pr_past3__{CELL}"])
+
+
+def test_forecast_mode_per_horizon_override(data):
+    idx = data["stage"].index
+    d = dict(data)
+    d["gr4j"] = pd.DataFrame({"q": 50.0, "s": 1.0, "r": 1.0}, index=idx)
+
+    def fc(v):
+        f = pd.DataFrame({(k, CELL): v for k in (1, 2, 3, 4)}, index=idx)
+        f.columns = pd.MultiIndex.from_tuples(f.columns, names=["lead", "cell"])
+        return {"pr": f, "gr4j_q": pd.DataFrame({k: 50.0 * v for k in (1, 2, 3, 4)}, index=idx)}
+
+    d["fcst"] = dict(fc(1.0), by_h={4: fc(2.0)})
+
+    x3 = features.build(d, [f"pr_nextH__{CELL}", "gr4j_dH"], horizon=3)
+    x4 = features.build(d, [f"pr_nextH__{CELL}", "gr4j_dH"], horizon=4)
+
+    np.testing.assert_allclose(x3[f"pr_nextH__{CELL}"], np.log1p(3.0))
+    np.testing.assert_allclose(x4[f"pr_nextH__{CELL}"], np.log1p(8.0))
+    np.testing.assert_allclose(x4["gr4j_dH"], np.log1p(100.0) - np.log1p(50.0))

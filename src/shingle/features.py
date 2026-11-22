@@ -16,7 +16,9 @@ Name grammar (matches analysis_run.candidate_features):
 
 Forecast mode: when data['fcst'] = {'pr': frame[(lead, cell)], 'gr4j_q': frame[lead]}
 (indexed by issue date), pr_next*/gr4j_dH use those issued forecasts instead of
-the observed future (training uses observed future rain).
+the observed future (training uses observed future rain). data['fcst']['by_h'][h]
+(same keys) overrides the forecast inputs for horizon-h models (e.g. bias-scaled rain
+only for longer horizons).
   log_s61, log_s59     log1p structure outflows (S-61 Toho, S-59 East Toho)
   stage_am_d, log_q_am_d, log_q_up_am_d
                        issue-time (next-morning) instantaneous reading minus day-t mean
@@ -39,6 +41,11 @@ _CELL = re.compile(r"^(pr_past|pr_next|wb_past)(\d+|H)__(.+)$")
 _DSTAGE = re.compile(r"^dstage_(\d+)$")
 _DTOHO = re.compile(r"^dtoho_(\d+)$")
 _LOGQ_D = re.compile(r"^log_q_d(\d+)$")
+
+
+def _fcst(data: dict, horizon: int | None) -> dict:
+    f = data["fcst"]
+    return f.get("by_h", {}).get(horizon, f)
 
 
 def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) -> pd.Series:
@@ -73,7 +80,7 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
             raise ValueError(f"{name} needs a horizon")
         lq = np.log1p(data["gr4j"]["q"])
         if "fcst" in data:
-            return np.log1p(data["fcst"]["gr4j_q"][horizon]).reindex(index) - lq
+            return np.log1p(_fcst(data, horizon)["gr4j_q"][horizon]).reindex(index) - lq
         return lq.shift(-horizon) - lq
     if name in ("gr4j_s", "gr4j_r"):
         return data["gr4j"][name.split("_")[1]]
@@ -105,7 +112,7 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
             return np.log1p(analysis.trailing_sum(data["pr"][[cell]], w)[cell])
         if kind == "pr_next":
             if "fcst" in data:
-                fc = data["fcst"]["pr"]
+                fc = _fcst(data, horizon)["pr"]
                 return np.log1p(sum(fc[(k, cell)] for k in range(1, w + 1))).reindex(index)
             return np.log1p(analysis.future_sum(data["pr"][[cell]], w)[cell])
         wb = data["pr"][[cell]] - data["pet"][[cell]]
