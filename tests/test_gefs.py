@@ -98,3 +98,12 @@ def test_fetch_run_retries_transient_errors():
     df = gefs.fetch_run(RUN, fhours=(24,), bbox=BBOX, retry_wait=0)
 
     assert list(df.index) == [24]
+
+
+def test_grid_lons_handle_wrapped_grids():
+    # GEFS: 0 .. 359.5 ; ECMWF open data: starts at 180 and wraps to 179.6
+    g = gefs.grid_lons(0.0, 720, 0.5)
+    assert g[0] == 0.0 and g[-1] == -0.5 and g[558] == pytest.approx(-81.0)
+    e = gefs.grid_lons(180.0, 900, 0.4)
+    assert e[0] == -180.0 and e[-1] == pytest.approx(179.6)
+    assert np.argmin(np.abs(e - (-81.2))) == round((180 - 81.2) / 0.4)

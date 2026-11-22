@@ -46,6 +46,12 @@ def apcp_range(idx_text: str) -> tuple[int, int, str]:
     raise KeyError("no APCP record in idx")
 
 
+def grid_lons(lon0: float, ni: int, dlon: float) -> np.ndarray:
+    """Longitudes of a regular grid row in -180..180 (handles grids starting at 180 and wrapping)."""
+    lons = (lon0 + np.arange(ni) * dlon) % 360.0
+    return np.round(np.where(lons >= 180, lons - 360, lons), 6)
+
+
 def decode_crop(raw: bytes, bbox: BBox, margin: float = RES) -> pd.Series:
     """Decode one GRIB2 message (regular lat/lon, 0..360 lon) and keep grid points
     within bbox +- margin. Index 'lat_lon' (4 dp, lon in -180..180), values mm."""
@@ -57,14 +63,13 @@ def decode_crop(raw: bytes, bbox: BBox, margin: float = RES) -> pd.Series:
         lat0 = eccodes.codes_get(h, "latitudeOfFirstGridPointInDegrees")
         lat1 = eccodes.codes_get(h, "latitudeOfLastGridPointInDegrees")
         lon0 = eccodes.codes_get(h, "longitudeOfFirstGridPointInDegrees")
-        lon1 = eccodes.codes_get(h, "longitudeOfLastGridPointInDegrees")
+        dlon = eccodes.codes_get(h, "iDirectionIncrementInDegrees")
         step = eccodes.codes_get(h, "stepRange")
         vals = eccodes.codes_get_values(h).reshape(nj, ni)
     finally:
         eccodes.codes_release(h)
     lats = np.linspace(lat0, lat1, nj)
-    lons = np.linspace(lon0, lon1, ni)
-    lons = np.where(lons > 180, lons - 360, lons)
+    lons = grid_lons(lon0, ni, dlon)
     rows = np.where((lats >= bbox.south - margin) & (lats <= bbox.north + margin))[0]
     cols = np.where((lons >= bbox.west - margin) & (lons <= bbox.east + margin))[0]
     out = {f"{lats[r]:.4f}_{lons[c]:.4f}": float(vals[r, c]) for r in rows for c in cols}
