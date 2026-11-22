@@ -41,3 +41,32 @@ def region_means(df: pd.DataFrame, clusters: pd.Series, prefix: str = "r") -> pd
         members = [c for c in clusters.index[clusters == cid] if c in df.columns]
         out[f"{prefix}{cid}"] = df[members].mean(axis=1, skipna=True)
     return pd.DataFrame(out, index=df.index)
+
+
+def bilinear_weights(targets: pd.DataFrame, sources: pd.DataFrame) -> dict[str, dict[str, float]]:
+    """Bilinear weights from a regular lat/lon source grid to each target point.
+
+    Targets outside the source grid are clamped to its edge.
+    """
+    lats = np.sort(sources["lat"].unique())
+    lons = np.sort(sources["lon"].unique())
+    ids = {(round(la, 6), round(lo, 6)): i for i, la, lo in zip(sources.index, sources["lat"], sources["lon"])}
+    out = {}
+    for tid, la, lo in zip(targets.index, targets["lat"], targets["lon"]):
+        la = float(np.clip(la, lats[0], lats[-1]))
+        lo = float(np.clip(lo, lons[0], lons[-1]))
+        i = int(np.clip(np.searchsorted(lats, la) - 1, 0, len(lats) - 2))
+        j = int(np.clip(np.searchsorted(lons, lo) - 1, 0, len(lons) - 2))
+        fy = (la - lats[i]) / (lats[i + 1] - lats[i])
+        fx = (lo - lons[j]) / (lons[j + 1] - lons[j])
+        w = {}
+        for di, wy in ((0, 1 - fy), (1, fy)):
+            for dj, wx in ((0, 1 - fx), (1, fx)):
+                sid = ids[(round(lats[i + di], 6), round(lons[j + dj], 6))]
+                w[sid] = w.get(sid, 0.0) + wy * wx
+        out[tid] = w
+    return out
+
+
+def apply_weights(df: pd.DataFrame, weights: dict[str, dict[str, float]]) -> pd.DataFrame:
+    return pd.DataFrame({t: sum(df[s] * v for s, v in w.items()) for t, w in weights.items()}, index=df.index)
