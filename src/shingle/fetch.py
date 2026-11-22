@@ -155,3 +155,51 @@ def fetch_iv_history(
 def load_iv(data_dir: Path, site: str) -> pd.DataFrame | None:
     path = Path(data_dir) / f"usgs_iv_{site}.parquet"
     return pd.read_parquet(path) if path.exists() else None
+
+
+def fetch_gefs_history(
+    data_dir: Path, start: str = "2020-10-01", end: str | None = None, kinds=("mean", "spread"),
+    workers: int = 8, today: str | None = None,
+) -> None:
+    """00Z GEFSv12 APCP buckets per run -> data/gefs/{kind}/YYYY-MM.parquet (index run, fhour).
+
+    Months entirely before `today` that already cover the requested runs are skipped
+    (resumable); runs missing from the archive are simply absent.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    import httpx
+
+    from home_display.shingle.sources import gefs
+
+    today_ts = pd.Timestamp(today) if today else pd.Timestamp.today().normalize()
+    end_ts = pd.Timestamp(end) if end else today_ts
+    start_ts = pd.Timestamp(start)
+    client = httpx.Client(timeout=60, limits=httpx.Limits(max_connections=workers * 2))
+    for kind in kinds:
+        out = Path(data_dir) / "gefs" / kind
+        out.mkdir(parents=True, exist_ok=True)
+        for month in pd.period_range(start_ts, end_ts, freq="M"):
+            runs = pd.date_range(max(start_ts, month.start_time), min(end_ts, month.end_time.normalize()))
+            path = out / f"{month}.parquet"
+            if path.exists() and month.end_time.normalize() < today_ts:
+                have = pd.read_parquet(path).index.get_level_values("run")
+                if have.min() <= runs[0] and have.max() >= runs[-1]:
+                    continue
+
+            def one(run, kind=kind):
+                df = gefs.fetch_run(run, bbox=config.BBOX, kind=kind, client=client)
+                if df is None:
+                    return None
+                return pd.concat({run: df}, names=["run"])
+
+            with ThreadPoolExecutor(workers) as ex:
+                parts = [p for p in ex.map(one, runs) if p is not None]
+            if parts:
+                pd.concat(parts).sort_index().to_parquet(path)
+
+
+def load_gefs(data_dir: Path, kind: str = "mean") -> pd.DataFrame:
+    parts = sorted((Path(data_dir) / "gefs" / kind).glob("*.parquet"))
+    df = pd.concat([pd.read_parquet(p) for p in parts]).sort_index()
+    return df[~df.index.duplicated(keep="last")]

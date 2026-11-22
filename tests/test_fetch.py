@@ -184,3 +184,28 @@ def test_fetch_iv_history_retries_and_checkpoints_each_year(tmp_path, monkeypatc
     # years completed before the failure are on disk -> a rerun resumes from there
     df = pd.read_parquet(tmp_path / "usgs_iv_A.parquet")
     assert df.index.max() >= pd.Timestamp("2022-12-31", tz="UTC")
+
+
+def test_fetch_gefs_history_writes_monthly_files_and_skips_complete(tmp_path, monkeypatch):
+    from home_display.shingle.sources import gefs
+
+    calls = []
+
+    def fake_run(run, fhours=None, bbox=None, kind="mean", client=None):
+        calls.append((run, kind))
+        if run == pd.Timestamp("2022-10-02"):
+            return None  # missing run
+        return pd.DataFrame({"28.5000_-81.5000": [1.0, 2.0]}, index=pd.Index([18, 24], name="fhour"))
+
+    monkeypatch.setattr(gefs, "fetch_run", fake_run)
+
+    fetch.fetch_gefs_history(tmp_path, start="2022-09-29", end="2022-10-03", kinds=("mean",), workers=2)
+    assert sorted({c[0] for c in calls}) == list(pd.date_range("2022-09-29", "2022-10-03"))
+    b = fetch.load_gefs(tmp_path, "mean")
+    assert b.index.names == ["run", "fhour"]
+    assert sorted(b.index.get_level_values("run").unique()) == [pd.Timestamp(d) for d in ("2022-09-29", "2022-09-30", "2022-10-01", "2022-10-03")]
+    assert (tmp_path / "gefs" / "mean" / "2022-09.parquet").exists()
+
+    calls.clear()  # September is complete and final -> not re-fetched; October re-fetched (not final)
+    fetch.fetch_gefs_history(tmp_path, start="2022-09-29", end="2022-10-03", kinds=("mean",), workers=2, today="2022-10-04")
+    assert all(c[0].month == 10 for c in calls)
