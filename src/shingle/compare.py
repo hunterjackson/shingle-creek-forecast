@@ -17,14 +17,20 @@ def score_models(
     eval_index: pd.DatetimeIndex,
     horizons=(1, 3, 7),
     high: float = config.FLOOD_STAGES["action"],
+    eval_data: dict | None = None,
 ) -> dict:
-    """Fit each model on train_index; predict eval_index with leave-one-year-out conformal bands."""
+    """Fit each model on train_index; predict eval_index with leave-one-year-out conformal bands.
+
+    eval_data: inputs available at forecast time (e.g. data with issued rain forecasts in
+    data['fcst']); used for prediction and band calibration. Defaults to `data`.
+    """
+    ed = data if eval_data is None else eval_data
     y = targets(data["stage"], horizons)
     low = float(data["stage"].loc[train_index].quantile(0.1))
     rows, ev_rows, forecasts = [], [], {}
     for name, model in models.items():
         model.fit(data, train_index)
-        fc = evaluate.cross_conformal_predict(model, data, eval_index)
+        fc = evaluate.cross_conformal_predict(model, ed, eval_index)
         forecasts[name] = fc
         for h in horizons:
             yy = y[f"h{h}"].loc[eval_index]
