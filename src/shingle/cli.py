@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from shingle import config, fetch, pipeline
+from shingle import config, fetch, pipeline, webdata
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -26,6 +26,13 @@ def main(argv: list[str] | None = None) -> None:
     p_pred.add_argument("--model", type=Path, default=pipeline.MODEL_PATH)
     p_pred.add_argument("--out", type=Path, default=pipeline.OUT_PATH)
     p_pred.add_argument("--no-update", action="store_true", help="use cached inputs only")
+    p_pred.add_argument("--log", type=Path, default=pipeline.LOG_PATH, help="forecast log CSV to append to")
+
+    p_site = sub.add_parser("site", help="write the static site's JSON (forecast, observed, scorecard)")
+    p_site.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
+    p_site.add_argument("--forecast", type=Path, default=pipeline.OUT_PATH)
+    p_site.add_argument("--log", type=Path, default=pipeline.LOG_PATH)
+    p_site.add_argument("--out-dir", type=Path, default=Path("site/data"))
 
     p_score = sub.add_parser("score", help="verify logged forecasts (ours vs NWM) against observed stage")
     p_score.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
@@ -40,6 +47,8 @@ def main(argv: list[str] | None = None) -> None:
         end = args.train_end or str((pd.Timestamp.now().normalize() - pd.Timedelta(days=8)).date())
         pipeline.train_from_disk(args.data_dir, args.model, end)
     elif args.cmd == "predict":
-        pipeline.predict_from_disk(args.data_dir, args.model, args.out, update=not args.no_update)
+        pipeline.predict_from_disk(args.data_dir, args.model, args.out, update=not args.no_update, log_path=args.log)
+    elif args.cmd == "site":
+        webdata.build(args.data_dir, args.forecast, args.log, args.out_dir)
     elif args.cmd == "score":
         print(pipeline.score_from_disk(args.data_dir, args.log).round(3).to_string())

@@ -50,7 +50,7 @@ def test_forecast_doc_end_to_end(world, tmp_path):
 def test_cli_routes_train_and_predict(monkeypatch, tmp_path):
     seen = []
     monkeypatch.setattr(pipeline, "train_from_disk", lambda data_dir, model_path, train_end: seen.append(("train", train_end)))
-    monkeypatch.setattr(pipeline, "predict_from_disk", lambda data_dir, model_path, out_path, update=True: seen.append(("predict", update)))
+    monkeypatch.setattr(pipeline, "predict_from_disk", lambda data_dir, model_path, out_path, update=True, log_path=None: seen.append(("predict", update)))
 
     cli.main(["train", "--data-dir", str(tmp_path), "--train-end", "2023-12-31"])
     cli.main(["predict", "--data-dir", str(tmp_path), "--no-update"])

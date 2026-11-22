@@ -32,7 +32,12 @@ def append(path, doc: dict, nwm_stage_h1: float | None = None) -> pd.DataFrame:
 
 def score(path, observed: pd.Series) -> pd.DataFrame:
     """Per-horizon MAE / bias / 80 % coverage of our forecasts and NWM (h1) against observed daily stage."""
-    log = pd.read_csv(path, parse_dates=["date"])
+    return score_frame(pd.read_csv(path), observed)
+
+
+def score_frame(log: pd.DataFrame, observed: pd.Series) -> pd.DataFrame:
+    log = log.copy()
+    log["date"] = pd.to_datetime(log["date"])
     log["obs"] = log["date"].map(observed)
     log = log.dropna(subset=["obs", "p50"])
     err = log["p50"] - log["obs"]
