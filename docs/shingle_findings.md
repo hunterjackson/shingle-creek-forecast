@@ -251,3 +251,22 @@ of hybrid+gr4j (1979–2023, blocked 3-yr folds; OOF MAE perfect rain .070/.155/
   (+3.6 ft)** → am features in the log-Q model extrapolate badly in the record flood; needs a fix
   (e.g. carry the morning rating residual instead of feeding am deltas to the flow model, or blend
   ARX+am for h1–h3 with hybrid for h4–7).
+
+## 2026-11-21 — floodplain rating + per-horizon morning features + blend (val 2022–23)
+Rating (train ≤2021): plain CombinedRating over-predicts the highest flows (Ian from *observed* Q:
+65.08/65.56/64.80 vs obs 63.82/64.15/63.86) and its lake branch (d≈1.53) explodes above the record
+(6000 cfs → 71.6 ft). Floodplain break + bounds (d ≤ 1.2, g ≥ 0.3): Ian 63.94/64.15/63.76, 6k/9k cfs →
+65.6/66.9 ft, train MAE .129 → .131. NB: hybrid's earlier Ian h7 "+0.54" was partly cancellation
+(rating +1.4 ft high at crest, flow forecast low).
+Morning features: only for h ≤ 3 and trained on the full record (LightGBM `allow_missing`, NaN before
+2007) — training on 2007+ only made no-rain h7 worse.
+
+| MAE (h1/h3/h7) | perfect rain | ≥59 h7 | low h7 | NO future rain | ≥59 h7 | low h7 | Ian h1/h3/h7 (perfect) |
+|---|---|---|---|---|---|---|---|
+| persistence | .127/.326/.584 | 4.88 | .198 | same | 4.88 | .198 | – |
+| hyb fp (floodplain rating) | .081/.177/.260 | 1.33 | **.091** | .081/.239/.443 | 4.14 | **.179** | +.21/−.41/+.78 |
+| hyb2 = hyb fp + am (h≤3) | .052/.158/.260 | 1.33 | **.091** | .052/.227/.443 | 4.14 | **.179** | +.04/+.83/+.78 |
+| arx2 = arx lgbm + am (h≤3) | **.040**/.149/.243 | 1.52 | .121 | **.040**/.232/.455 | 3.65 | .296 | .00/−.13/−2.33 |
+| **blend .5 arx2/hyb2** | **.040/.146/.228** | **0.87** | .104 | .041/**.224/.432** | 3.62 | .233 | −.15/+.35/−.78 |
+- Morning reading halves h1 error in both brackets; blend is best overall and for floods; hybrid alone
+  remains best for low water at h7. Next: weights chosen out-of-sample (not on val), real forecast rain.
