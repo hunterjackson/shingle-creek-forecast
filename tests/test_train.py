@@ -57,3 +57,15 @@ def test_predict_gives_ordered_quantiles_for_each_horizon_and_uses_the_forecast(
     wet.loc[day] = wet.loc[day] + 40.0  # much more forecast rain issued that day
     fc_wet = train.predict(art, hist, wet, src, issue_day=day)
     assert fc_wet["p50"].iloc[-1] > fc["p50"].iloc[-1]
+
+
+def test_backtest_matches_single_day_predict(trained):
+    hist, raw, src, art = trained
+    idx = hist["gauge"].index
+    days = idx[3 * 365 + 40 : 3 * 365 + 50]
+
+    bt = train.backtest(art, hist, raw, src, days)
+
+    assert list(bt.columns) == base.forecast_columns(H)
+    one = train.predict(art, hist, raw, src, issue_day=days[3])
+    np.testing.assert_allclose(bt.loc[days[3], [f"h{h}_p50" for h in H]].to_numpy(float), one["p50"].to_numpy(float))

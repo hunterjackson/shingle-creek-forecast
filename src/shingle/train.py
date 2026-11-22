@@ -108,3 +108,13 @@ def save(art: Artifact, path) -> None:
 
 def load(path) -> Artifact:
     return pickle.loads(Path(path).read_bytes())
+
+
+def backtest(art: Artifact, hist: dict, raw: pd.DataFrame, src: pd.DataFrame, index: pd.DatetimeIndex, future: str = "forecast") -> pd.DataFrame:
+    """Forecasts for many issue days at once from archived inputs.
+
+    future='forecast' uses the issued GEFS rain (honest), 'perfect' the observed future rain.
+    """
+    data = _with_gr4j(hist, art.gr4j)
+    d = _forecast_data(data, hist, raw, src, art.gr4j, art.scale, art.horizons) if future == "forecast" else data
+    return art.model.predict(d, pd.DatetimeIndex(index))
