@@ -86,3 +86,15 @@ def test_daily_leads_nan_when_bucket_missing():
     out = gefs.daily_leads(buckets, leads=(1,))
 
     assert np.isnan(out.iloc[0][(1, "c")])
+
+
+@respx.mock
+def test_fetch_run_retries_transient_errors():
+    text = (FIXTURES / "gefs_geavg_f024.idx").read_text()
+    raw = (FIXTURES / "gefs_apcp_f024.grib2").read_bytes()
+    respx.get(url__regex=r".*\.idx$").mock(side_effect=[httpx.ConnectTimeout("handshake"), httpx.Response(200, text=text)])
+    respx.get(url__regex=r".*0p50\.f0\d\d$").mock(side_effect=[httpx.ReadTimeout("slow"), httpx.Response(206, content=raw)])
+
+    df = gefs.fetch_run(RUN, fhours=(24,), bbox=BBOX, retry_wait=0)
+
+    assert list(df.index) == [24]
