@@ -55,3 +55,34 @@ def test_simulate_does_not_use_future_for_states(data):
 
     after = drv.simulate(pert).iloc[t]
     pd.testing.assert_series_equal(before, after)
+
+
+def test_forecast_restarts_from_state_with_given_areal_rain(data):
+    idx = data["q"].index
+    drv = gr4j_driver.GR4JDriver({"a": 0.5, "b": 0.5})
+    drv.params = gr4j.Params(300.0, -0.5, 120.0, 2.0)
+    sim = drv.simulate(data)
+    P = gr4j_driver.areal(data["pr"], drv.weights)
+    E = gr4j_driver.areal(data["pet"], {"a": 1.0, "b": 1.0})
+    K = 3
+    P_fc = pd.DataFrame({k: P.shift(-k) for k in range(1, K + 1)}, index=idx)
+    E_fc = pd.DataFrame({k: E.shift(-k) for k in range(1, K + 1)}, index=idx)
+
+    fc = drv.forecast(data, P_fc, E_fc)
+
+    assert list(fc.columns) == [1, 2, 3] and fc.index.equals(idx)
+    t = idx[500]
+    for k in (1, 2, 3):
+        assert fc.loc[t, k] == pytest.approx(sim["q"].shift(-k).loc[t], rel=1e-8)
+    assert fc.iloc[-1].isna().all()
+
+
+def test_forecast_default_pet_is_recent_mean(data):
+    idx = data["q"].index
+    drv = gr4j_driver.GR4JDriver({"a": 0.5, "b": 0.5})
+    drv.params = gr4j.Params(300.0, -0.5, 120.0, 2.0)
+    P_fc = pd.DataFrame({1: 0.0, 2: 0.0}, index=idx)
+
+    fc = drv.forecast(data, P_fc)  # E_fc=None -> trailing 7-day mean PET persisted
+
+    assert fc.loc[idx[10]:].notna().all().all()

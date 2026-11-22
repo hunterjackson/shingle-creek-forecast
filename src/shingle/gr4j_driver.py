@@ -8,6 +8,7 @@ the pr_next features.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from home_display.shingle.models import gr4j
@@ -54,3 +55,21 @@ class GR4JDriver:
             {"q": gr4j.mm_day_to_cfs(out["q"], self.area), "s": out["s"], "r": out["r"]}, index=P.index[ok]
         )
         return sim.reindex(P.index)
+
+    def forecast(self, data: dict, P_fc: pd.DataFrame, E_fc: pd.DataFrame | None = None) -> pd.DataFrame:
+        """Flow forecast (cfs) per issue date t and lead k (columns 1..K): GR4J restarted
+        from its state at the end of day t with forecast areal rain P_fc (mm, columns =
+        leads). E_fc defaults to the trailing 7-day mean PET held constant."""
+        P, E = self._inputs(data)
+        ok = P.notna() & E.notna()
+        idx = P.index[ok]
+        leads = list(P_fc.columns)
+        Pf = P_fc.reindex(idx)[leads].to_numpy(float)
+        if E_fc is None:
+            e7 = E.rolling(7, min_periods=1).mean()
+            Ef = np.repeat(e7.loc[idx].to_numpy(float)[:, None], len(leads), axis=1)
+        else:
+            Ef = E_fc.reindex(idx)[leads].to_numpy(float)
+        q = gr4j.forecast(P[ok].to_numpy(), E[ok].to_numpy(), Pf, Ef, self.params)
+        out = pd.DataFrame(gr4j.mm_day_to_cfs(q, self.area), index=idx, columns=leads)
+        return out.reindex(P.index)

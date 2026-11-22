@@ -13,6 +13,10 @@ Name grammar (matches analysis_run.candidate_features):
   gr4j_logq, gr4j_s, gr4j_r  GR4J simulated log1p flow / store levels at t
   gr4j_dH              GR4J simulated log-flow change t -> t+h (driven by future rain)
   rad_<rain feature>    any pr_/wb_ feature computed on data['radar'] (MRMS regions)
+
+Forecast mode: when data['fcst'] = {'pr': frame[(lead, cell)], 'gr4j_q': frame[lead]}
+(indexed by issue date), pr_next*/gr4j_dH use those issued forecasts instead of
+the observed future (training uses observed future rain).
   log_s61, log_s59     log1p structure outflows (S-61 Toho, S-59 East Toho)
   stage_am_d, log_q_am_d, log_q_up_am_d
                        issue-time (next-morning) instantaneous reading minus day-t mean
@@ -68,6 +72,8 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
         if horizon is None:
             raise ValueError(f"{name} needs a horizon")
         lq = np.log1p(data["gr4j"]["q"])
+        if "fcst" in data:
+            return np.log1p(data["fcst"]["gr4j_q"][horizon]).reindex(index) - lq
         return lq.shift(-horizon) - lq
     if name in ("gr4j_s", "gr4j_r"):
         return data["gr4j"][name.split("_")[1]]
@@ -98,6 +104,9 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
         if kind == "pr_past":
             return np.log1p(analysis.trailing_sum(data["pr"][[cell]], w)[cell])
         if kind == "pr_next":
+            if "fcst" in data:
+                fc = data["fcst"]["pr"]
+                return np.log1p(sum(fc[(k, cell)] for k in range(1, w + 1))).reindex(index)
             return np.log1p(analysis.future_sum(data["pr"][[cell]], w)[cell])
         wb = data["pr"][[cell]] - data["pet"][[cell]]
         return analysis.trailing_sum(wb, w)[cell]

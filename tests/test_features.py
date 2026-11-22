@@ -175,3 +175,21 @@ def test_issue_time_reading_features(data):
     np.testing.assert_allclose(X["stage_am_d"], 0.3)
     np.testing.assert_allclose(X["log_q_am_d"], np.log1p(d["q"] * 2) - np.log1p(d["q"]))
     np.testing.assert_allclose(X["log_q_up_am_d"], np.log1p(d["q_up"] * 3) - np.log1p(d["q_up"]))
+
+
+def test_forecast_mode_replaces_future_rain_and_gr4j_change(data):
+    idx = data["stage"].index
+    d = dict(data)
+    d["gr4j"] = pd.DataFrame({"q": 50.0, "s": 1.0, "r": 1.0}, index=idx)
+    leads = [1, 2, 3]
+    fc_pr = pd.DataFrame({(k, c): float(k) for k in leads for c in (CELL, CELL2)}, index=idx)
+    fc_pr.columns = pd.MultiIndex.from_tuples(fc_pr.columns, names=["lead", "cell"])
+    d["fcst"] = {"pr": fc_pr, "gr4j_q": pd.DataFrame({k: 50.0 * (1 + k) for k in leads}, index=idx)}
+
+    X = features.build(d, [f"pr_nextH__{CELL}", f"pr_next2__{CELL2}", "gr4j_dH", f"pr_past3__{CELL}"], horizon=3)
+
+    np.testing.assert_allclose(X[f"pr_nextH__{CELL}"], np.log1p(1 + 2 + 3))
+    np.testing.assert_allclose(X[f"pr_next2__{CELL2}"], np.log1p(1 + 2))
+    np.testing.assert_allclose(X["gr4j_dH"], np.log1p(200.0) - np.log1p(50.0))
+    # past features untouched by the forecast
+    pd.testing.assert_series_equal(X[f"pr_past3__{CELL}"], features.build(data, [f"pr_past3__{CELL}"])[f"pr_past3__{CELL}"])

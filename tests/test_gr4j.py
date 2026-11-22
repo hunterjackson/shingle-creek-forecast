@@ -110,3 +110,37 @@ def test_unit_conversions_preserve_pandas_index():
     assert isinstance(out, pd.Series)
     assert out.index.equals(s.index)
     assert isinstance(gr4j.mm_day_to_cfs(out, 466.2), pd.Series)
+
+
+def test_forecast_with_perfect_inputs_reproduces_simulation():
+    rng = np.random.default_rng(3)
+    n, K = 400, 7
+    P = rng.gamma(0.4, 8, n)
+    E = np.full(n, 3.5)
+    p = gr4j.Params(x1=300.0, x2=-0.5, x3=80.0, x4=2.3)
+    sim = gr4j.run(P, E, p)["q"]
+    # forecast issued after day t, perfect knowledge of the next K days
+    Pf = np.full((n, K), np.nan)
+    Ef = np.full((n, K), 3.5)
+    for t in range(n - K):
+        Pf[t] = P[t + 1 : t + 1 + K]
+
+    qf = gr4j.forecast(P, E, Pf, Ef, p)
+
+    assert qf.shape == (n, K)
+    for t in (10, 150, 300):
+        np.testing.assert_allclose(qf[t], sim[t + 1 : t + 1 + K], rtol=1e-10)
+    assert np.isnan(qf[n - 1]).all()  # NaN forecast input -> NaN output
+
+
+def test_forecast_with_no_rain_recedes_from_current_state():
+    rng = np.random.default_rng(4)
+    n, K = 200, 5
+    P = rng.gamma(0.4, 8, n)
+    E = np.full(n, 3.5)
+    p = gr4j.Params(x1=300.0, x2=0.0, x3=80.0, x4=1.5)
+
+    qf = gr4j.forecast(P, E, np.zeros((n, K)), np.zeros((n, K)), p)
+
+    assert (np.diff(qf[100]) <= 1e-12).all() or qf[100, -1] < qf[100].max()
+    assert (qf >= 0).all()
