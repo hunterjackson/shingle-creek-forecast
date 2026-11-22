@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 
 import pandas as pd
@@ -14,7 +13,7 @@ _ORDER = ("major", "moderate", "minor", "action")
 
 
 def flood_category(stage: float) -> str:
-    if stage is None or (isinstance(stage, float) and math.isnan(stage)):
+    if stage is None or pd.isna(stage):
         return "unknown"
     for cat in _ORDER:
         if stage >= config.FLOOD_STAGES[cat]:
@@ -23,7 +22,7 @@ def flood_category(stage: float) -> str:
 
 
 def _r(x: float, nd: int = 2):
-    return None if x is None or (isinstance(x, float) and math.isnan(x)) else round(float(x), nd)
+    return None if x is None or pd.isna(x) else round(float(x), nd)
 
 
 def write_json(path, fc: pd.DataFrame, current_stage: float, current_time: pd.Timestamp, issue_day: pd.Timestamp,

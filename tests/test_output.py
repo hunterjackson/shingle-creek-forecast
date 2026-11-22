@@ -29,3 +29,12 @@ def test_forecast_json_schema(tmp_path):
     assert doc["forecast"][1] == {"date": "2024-10-11", "p10": 56.0, "p50": 59.5, "p90": 61.2, "category": "action",
                                   "p90_category": "moderate", "rain_mm": 40.0}
     assert doc["issue_day"] == "2024-10-09" and doc["model"] == {"train_end": "2023-12-31"}
+
+
+def test_missing_values_become_null(tmp_path):
+    fc = pd.DataFrame({"date": pd.date_range("2024-10-10", periods=1), "p10": [float("nan")], "p50": [float("nan")], "p90": [float("nan")]})
+
+    doc = output.write_json(tmp_path / "x.json", fc, current_stage=float("nan"), current_time=pd.Timestamp("2024-10-09", tz="UTC"),
+                            issue_day=pd.Timestamp("2024-10-09"))
+
+    assert doc["forecast"][0]["p50"] is None and doc["forecast"][0]["category"] == "unknown"
