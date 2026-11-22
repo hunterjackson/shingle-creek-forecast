@@ -209,3 +209,21 @@ def test_fetch_gefs_history_writes_monthly_files_and_skips_complete(tmp_path, mo
     calls.clear()  # September is complete and final -> not re-fetched; October re-fetched (not final)
     fetch.fetch_gefs_history(tmp_path, start="2022-09-29", end="2022-10-03", kinds=("mean",), workers=2, today="2022-10-04")
     assert all(c[0].month == 10 for c in calls)
+
+
+def test_fetch_mrms_history_12z_goes_to_own_dir(tmp_path, monkeypatch):
+    from home_display.shingle.sources import mrms
+
+    seen = []
+
+    def fake_fetch(start, end, bbox, workers=8, hour=5):
+        seen.append(hour)
+        return pd.DataFrame({"28.500_-81.500": 2.0}, index=pd.date_range(start, end, name="date"))
+
+    monkeypatch.setattr(mrms, "fetch", fake_fetch)
+
+    fetch.fetch_mrms_history(tmp_path, start="2024-01-01", today="2024-01-05", hour=12)
+
+    assert seen == [12]
+    assert (tmp_path / "mrms12" / "2024-01.parquet").exists() and not (tmp_path / "mrms").exists()
+    assert fetch.load_mrms(tmp_path, hour=12)["28.500_-81.500"].eq(2.0).all()

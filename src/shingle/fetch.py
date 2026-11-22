@@ -77,7 +77,11 @@ def fetch_nwm_retro(data_dir: Path, start: str = "1979-02-02", end: str = "2023-
     return df
 
 
-def fetch_mrms_history(data_dir: Path, start: str | None = None, today: str | None = None, workers: int = 8) -> None:
+def _mrms_dir(data_dir: Path, hour: int) -> Path:
+    return Path(data_dir) / ("mrms" if hour == 5 else f"mrms{hour:02d}")
+
+
+def fetch_mrms_history(data_dir: Path, start: str | None = None, today: str | None = None, workers: int = 8, hour: int = 5) -> None:
     """Download MRMS daily QPE month by month into data/mrms/YYYY-MM.parquet (resumable).
 
     A month file is considered final once its last day is >= 5 days before
@@ -85,7 +89,7 @@ def fetch_mrms_history(data_dir: Path, start: str | None = None, today: str | No
     """
     from home_display.shingle.sources import mrms
 
-    out = Path(data_dir) / "mrms"
+    out = _mrms_dir(data_dir, hour)
     out.mkdir(parents=True, exist_ok=True)
     start_ts = pd.Timestamp(start) if start else mrms.START
     end_ts = pd.Timestamp(today) if today else pd.Timestamp.today().normalize() - pd.Timedelta(days=1)
@@ -99,12 +103,13 @@ def fetch_mrms_history(data_dir: Path, start: str | None = None, today: str | No
             existing = pd.read_parquet(path)
             if existing.index.max() >= month.end_time.normalize():
                 continue
-        df = mrms.fetch(m_start.strftime("%Y-%m-%d"), m_end.strftime("%Y-%m-%d"), config.BBOX, workers=workers)
+        kw = {"hour": hour} if hour != 5 else {}
+        df = mrms.fetch(m_start.strftime("%Y-%m-%d"), m_end.strftime("%Y-%m-%d"), config.BBOX, workers=workers, **kw)
         df.to_parquet(path)
 
 
-def load_mrms(data_dir: Path) -> pd.DataFrame:
-    parts = sorted((Path(data_dir) / "mrms").glob("*.parquet"))
+def load_mrms(data_dir: Path, hour: int = 5) -> pd.DataFrame:
+    parts = sorted(_mrms_dir(data_dir, hour).glob("*.parquet"))
     df = pd.concat([pd.read_parquet(p) for p in parts]).sort_index()
     df = df[~df.index.duplicated(keep="last")]
     df.index.name = "date"
