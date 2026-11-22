@@ -384,3 +384,14 @@ knowledge of the future* as ceilings; all days and low-flow days (Q < 200 cfs, T
 - Milton crest 10-13 (60.56): NWM h1 for 10-11 forecast 63.94 (3 473 cfs vs obs 1 390), ours 59.25 (obs 59.02);
   NWM recession far too fast (h1 on 10-18: 56.81 vs obs 58.25; ours 58.13).
 - Note this sample over-weights Milton (persistence .157/.353/.653 here vs .105/.260/.483 on all test days).
+
+## 2026-11-22 — operational NWM forecast as an input? (val 2022–23 only; test not used)
+- Archived medium-range mem1 (06Z of t+1) for every 3rd val day + Ian daily (262 issue days, 3.6 k files, 152 s).
+  Candidates vs residuals of the packaged val artifact (train ≤2021, issued GEFS): NWM log-flow, NWM change
+  vs today's observed flow, NWM's own trajectory, NWM-stage minus ours.
+- Pearson r .25–.34 at h3–h7 (block-bootstrap CI > 0 at h4–7; Spearman .1–.3), h1–h2 driven by Ian (CI spans 0).
+- Decisive check — Huber correction of our residual from the NWM terms, quarterly blocked CV inside val:
+  MAE change h1..h7 mostly **worse** (+0.3…+13 %), best case −3…−4 % at h5/h7 with one term, not consistent
+  ex-Ian. ⇒ correlation is event-driven and not exploitable. Plus costs: archive only 2018+ (≈60–110 GB to
+  build training history; feature index changes per NWM version), extra live dependency. **Not adopted.**
+  Likely source of the weak signal is NWM's GFS rain, i.e. information about forecast rain, not hydrology.
