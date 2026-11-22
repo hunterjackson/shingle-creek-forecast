@@ -213,3 +213,9 @@ def test_forecast_mode_per_horizon_override(data):
     np.testing.assert_allclose(x3[f"pr_nextH__{CELL}"], np.log1p(3.0))
     np.testing.assert_allclose(x4[f"pr_nextH__{CELL}"], np.log1p(8.0))
     np.testing.assert_allclose(x4["gr4j_dH"], np.log1p(100.0) - np.log1p(50.0))
+
+
+def test_issue_time_features_are_nan_when_readings_absent(data):
+    X = features.build(data, ["stage_am_d", "log_q_am_d", "log_q_up_am_d"])
+
+    assert X.isna().all().all()

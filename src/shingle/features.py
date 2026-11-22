@@ -90,11 +90,14 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
         return np.log1p(data["s59_q"].clip(lower=0))
     if name == "etoho":
         return data["etoho"]
-    if name == "stage_am_d":
-        return data["stage_am"] - data["stage"]
-    if name == "log_q_am_d":
-        return np.log1p(data["q_am"].clip(lower=0)) - np.log1p(data["q"])
-    if name == "log_q_up_am_d":
+    if name in ("stage_am_d", "log_q_am_d", "log_q_up_am_d"):
+        key = {"stage_am_d": "stage_am", "log_q_am_d": "q_am", "log_q_up_am_d": "q_up_am"}[name]
+        if key not in data:  # no intraday feed -> missing (models learned a missing-value branch pre-2007)
+            return pd.Series(np.nan, index=index)
+        if name == "stage_am_d":
+            return data["stage_am"] - data["stage"]
+        if name == "log_q_am_d":
+            return np.log1p(data["q_am"].clip(lower=0)) - np.log1p(data["q"])
         return np.log1p(data["q_up_am"].clip(lower=0)) - np.log1p(data["q_up"])
     if name == "log_q_up":
         return np.log1p(data["q_up"])
