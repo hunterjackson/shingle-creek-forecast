@@ -347,3 +347,40 @@ archive (live runs fill the last 1–2 days with MRMS; checked separately). Scri
   17+25 mm on 11-17/18 (56.22 ft at 00Z); forecast p50 56.05 → peak 56.24 (11-23) → 55.75 (11-27), all normal
   category; NWM short-range h1 → 55.57 ft logged alongside. Partial IV mean for 11-21 already 56.09 → our h1
   likely ~0.05–0.07 ft low (steady rise under-forecast; S-61 releases ramping 0.8→2.2 kcfs).
+
+## 2026-11-22 — downstream operations + evaporation screen (production model OOF residuals)
+OOF residuals of `spec.build_model` (perfect future rain, morning readings), 1979–2023, 3-yr blocks:
+MAE h1/h3/h7 .054/.143/.234. Candidates (level, 1/3/7-day change, 30/365-day anomaly) plus *perfect
+knowledge of the future* as ceilings; all days and low-flow days (Q < 200 cfs, Toho backwater regime).
+| candidate | r with residual (h1/h3/h7, all days) |
+|---|---|
+| future S-61 release change (perfect) | .01/.01/.00 — knowing releases ahead adds nothing |
+| future ET0 anomaly, basin gridMET (perfect) | −.01/−.04/−.06 — forecast ET not worth adding |
+| past ET0 anomaly 7/30 d, S-61/S-59 changes, Toho net gauged inflow, E. Toho | all ≤ .07 |
+| future Toho change (perfect) | .17/.27/.31 (low flow .08/.26/.32) |
+- ⇒ The only downstream information that would help is *where Toho is going*, and no current series
+  predicts that beyond what the lake model already uses (Toho, schedule deviation, S-61, S-59, rain).
+  Ruled out: S-61 operations, evaporation (past anomaly or forecast). Lake Cypress/Hatchineha (S-61
+  tailwater) skipped — tied to Lake Kissimmee, already ruled out.
+
+## 2026-11-22 — head-to-head vs operational NWM forecasts (test period 2024-01..2026-11)
+- Source: Google Cloud public archive `national-water-model/nwm.YYYYMMDD/medium_range_mem1/` (operational
+  v3.0/v3.1 output, 2018+). Each channel_rt file stores streamflow as ONE gzip chunk over 2.78 M reaches
+  (~2 MB) + feature_id chunk (~0.6 MB), so one reach costs ~2.7 MB/file via HTTP range reads (h5py+fsspec;
+  h5py's global lock serialises threads → use processes: 3 262 files in 142 s).
+- Run used: 06Z run of t+1 (available ~11Z, before our ~13Z issue → generous to NWM); LST day t+k = mean of
+  f(5+24(k−1)) and f(17+24(k−1)). Flow → stage with our floodplain rating (final-test artifact, ≤2023) using
+  *observed* Toho on the target day (generous; Toho at issue time is slightly worse).
+- Sample: every 5th issue day 2024-01-01..2026-11-11 + daily 2024-09-28..10-25 (Milton) = 233 issue days.
+| MAE ft | h1 | h2 | h3 | h4 | h5 | h6 | h7 |
+|---|---|---|---|---|---|---|---|
+| ours (issued GEFS) | **.038** | **.102** | **.134** | **.262** | **.286** | **.329** | **.358** |
+| NWM medium-range mem1 | .506 | .841 | .806 | .780 | .762 | .787 | .817 |
+| persistence | .157 | .265 | .353 | .441 | .507 | .584 | .653 |
+| ours better on % of days | 97 | 92 | 85 | 82 | 79 | 76 | 76 |
+- NWM flow biased **+25 % (h1) … +57 % (h2)**, stage bias +0.27…+0.64 ft (ours ≤ ±0.07). NWM loses to
+  persistence at every horizon. Flood days (n=6, Milton) MAE h1/h3/h7: ours .11/.62/.94, NWM 1.65/1.59/2.37;
+  NWM better only at h4–5 (1.17/1.23 vs ours 1.66/1.55 — our known GEFS-scaled Milton over-forecast).
+- Milton crest 10-13 (60.56): NWM h1 for 10-11 forecast 63.94 (3 473 cfs vs obs 1 390), ours 59.25 (obs 59.02);
+  NWM recession far too fast (h1 on 10-18: 56.81 vs obs 58.25; ours 58.13).
+- Note this sample over-weights Milton (persistence .157/.353/.653 here vs .105/.260/.483 on all test days).
