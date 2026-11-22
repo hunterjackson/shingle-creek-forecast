@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shingle Creek forecast</title>
+  <meta name="description" content="7-day water level forecast for Shingle Creek at Campbell, Florida (USGS 02264495), updated every few hours.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='1' width='20' height='30' rx='2' fill='%23fff' stroke='%23111' stroke-width='2'/%3E%3Cpath d='M9 5h7v2H11v2h5v2H11v2h5v2H9z' fill='%23111'/%3E%3Crect x='7' y='19' width='18' height='11' fill='%232a78d6'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="masthead">
+    <p class="eyebrow">Shingle Creek at Campbell, FL · USGS 02264495 · NWS SHIF1</p>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="now-heading">
+      <figure class="gauge" aria-describedby="gauge-desc">
+        <svg id="gauge" role="img" aria-labelledby="gauge-desc"></svg>
+        <figcaption id="gauge-desc" class="sr-only">Staff gauge showing the current level against flood stages.</figcaption>
+      </figure>
+      <div class="reading">
+        <h1 id="now-heading" class="sr-only">Current level</h1>
+        <p class="stage"><span id="stage-value">—</span><span class="unit">ft</span></p>
+        <p class="status-row">
+          <span id="category" class="chip" data-cat="unknown"><span class="chip-icon" aria-hidden="true"></span><span class="chip-text">Loading</span></span>
+          <span id="trend" class="trend"></span>
+        </p>
+        <p id="as-of" class="as-of"></p>
+        <p id="headline" class="headline"></p>
+        <table class="week" aria-label="7-day forecast">
+          <thead><tr><th scope="col">Day</th><th scope="col">Expected</th><th scope="col">Likely range</th><th scope="col">Rain</th></tr></thead>
+          <tbody id="week-body"></tbody>
+        </table>
+        <p class="note">Likely range: about 8 in 10 days landed inside it in testing, fewer during floods. Rain is the forecast basin average.</p>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="hydro-heading">
+      <div class="panel-head">
+        <h2 id="hydro-heading">Last 30 days and the week ahead</h2>
+        <ul class="legend" aria-label="Legend">
+          <li><span class="key key-obs" aria-hidden="true"></span>Observed</li>
+          <li><span class="key key-fc" aria-hidden="true"></span>Forecast</li>
+          <li><span class="key key-band" aria-hidden="true"></span>Likely range</li>
+        </ul>
+      </div>
+      <div id="hydro" class="hydro"></div>
+      <details class="data-table">
+        <summary>Show observed daily levels as a table</summary>
+        <table><thead><tr><th scope="col">Date</th><th scope="col">Creek (ft)</th><th scope="col">Lake Toho (ft)</th></tr></thead><tbody id="obs-body"></tbody></table>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="record-heading">
+      <h2 id="record-heading">Track record</h2>
+      <p class="lede">Every forecast is logged when it's issued and scored once the day has passed. The comparison is with the National Water Model, NOAA's nationwide forecast, which publishes day-1 flows for this creek.</p>
+      <div id="record"></div>
+      <h3>Tested on 2024–2026 before going live</h3>
+      <p class="lede">Average miss in feet, on data the model never saw while it was built, using the rain forecasts that were actually issued each day. Persistence means assuming the level won't change.</p>
+      <table class="results">
+        <thead><tr><th scope="col">Days ahead</th><th scope="col">1</th><th scope="col">3</th><th scope="col">5</th><th scope="col">7</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">This forecast</th><td>0.03</td><td>0.14</td><td>0.26</td><td>0.32</td></tr>
+          <tr><th scope="row">Persistence</th><td>0.10</td><td>0.26</td><td>0.39</td><td>0.48</td></tr>
+          <tr><th scope="row">National Water Model<sup>*</sup></th><td>0.51</td><td>0.81</td><td>0.76</td><td>0.82</td></tr>
+        </tbody>
+      </table>
+      <p class="note"><sup>*</sup>Scored on a 233-day sample that includes Hurricane Milton; on the same sample this forecast missed by 0.04 / 0.13 / 0.29 / 0.36 ft.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="raw-heading">
+      <h2 id="raw-heading">Raw data</h2>
+      <p class="lede">The same files this page reads, refreshed every few hours. Stages are in feet (NGVD29), rain in millimetres, times in UTC.</p>
+      <ul class="raw-links">
+        <li><a href="https://raw.githubusercontent.com/hunterjackson/shingle-creek-forecast/main/site/data/forecast.json">forecast.json</a> — current reading and the 7-day forecast (expected level, likely range, flood category, rain)</li>
+        <li><a href="https://raw.githubusercontent.com/hunterjackson/shingle-creek-forecast/main/site/data/observed.json">observed.json</a> — daily creek and Lake Toho levels for 45 days, hourly creek levels for 10 days</li>
+        <li><a href="https://raw.githubusercontent.com/hunterjackson/shingle-creek-forecast/main/site/data/scorecard.json">scorecard.json</a> — verification of past forecasts</li>
+        <li><a href="https://raw.githubusercontent.com/hunterjackson/shingle-creek-forecast/main/site/data/forecast_log.csv">forecast_log.csv</a> — every forecast issued, one row per day ahead</li>
+      </ul>
+    </section>
+
+    <section class="panel how" aria-labelledby="how-heading">
+      <h2 id="how-heading">How the forecast works</h2>
+      <p>At low and moderate flows the creek's level is set by Lake Tohopekaliga a few miles downstream, so the forecast works out two things: how much water the creek will carry, and where the lake will sit. Flow starts from a rainfall–runoff model of the 180-square-mile basin, driven by gridded rainfall, radar for the most recent day or two, and NOAA's GEFS rain forecast for the week ahead.</p>
+      <p>Machine-learning models then combine that with the morning gauge reading, the upstream gauge near Kissimmee, the levels of Lake Toho and East Lake Toho against their regulation schedule, and releases at structures S-59 and S-61. One model predicts the level directly; the other predicts flow and lake level and converts them to a creek level. The forecast is the average of the two.</p>
+      <p>Lake Kissimmee, Lake Okeechobee, groundwater wells, evaporation forecasts and the National Water Model were tested as extra inputs and left out because they didn't improve accuracy.</p>
+      <p class="disclaimer">This is an experimental, independent forecast, not an official one. For flood warnings, follow the <a href="https://www.weather.gov/mlb/">National Weather Service in Melbourne</a> and <a href="https://www.osceola.org/agencies-departments/emergency-management/">Osceola County Emergency Management</a>.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Data: <a href="https://waterdata.usgs.gov/monitoring-location/02264495/">USGS</a> · <a href="https://www.sfwmd.gov/science-data/dbhydro">SFWMD DBHYDRO</a> · <a href="https://www.climatologylab.org/gridmet.html">gridMET</a> · <a href="https://mesonet.agron.iastate.edu/">IEM MRMS archive</a> · <a href="https://registry.opendata.aws/noaa-gefs/">NOAA GEFS</a> · <a href="https://water.noaa.gov/">NOAA NWPS</a></p>
+    <p id="generated"></p>
+    <p><a href="#raw-heading">Raw data</a> · <a href="https://github.com/hunterjackson/shingle-creek-forecast">Source on GitHub</a></p>
+  </footer>
+
+  <div id="tooltip" class="tooltip" role="status" hidden></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
