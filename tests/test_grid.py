@@ -92,3 +92,16 @@ def test_apply_weights_builds_target_columns():
     out = grid.apply_weights(df, {"t": {"a": 0.25, "b": 0.75}})
 
     assert out["t"].tolist() == [2.5, 3.5]
+
+
+def test_cell_means_average_pixels_inside_each_target_cell():
+    idx = pd.date_range("2020-01-01", periods=2)
+    # 0.01 deg pixels; target cell centred 28.2750,-81.4333 with half-width 1/48 deg (~0.0208)
+    px = {"28.270_-81.430": [1.0, 2.0], "28.280_-81.440": [3.0, 4.0], "28.300_-81.433": [100.0, 100.0]}
+    df = pd.DataFrame(px, index=idx)
+    cells = pd.DataFrame({"lat": [28.2750], "lon": [-81.4333]}, index=["28.2750_-81.4333"])
+
+    out = grid.cell_means(df, cells, half_width=1 / 48)
+
+    assert list(out.columns) == ["28.2750_-81.4333"]
+    assert out.iloc[:, 0].tolist() == [2.0, 3.0]  # the 28.300 pixel is outside the cell

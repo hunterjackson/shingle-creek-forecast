@@ -70,3 +70,13 @@ def bilinear_weights(targets: pd.DataFrame, sources: pd.DataFrame) -> dict[str, 
 
 def apply_weights(df: pd.DataFrame, weights: dict[str, dict[str, float]]) -> pd.DataFrame:
     return pd.DataFrame({t: sum(df[s] * v for s, v in w.items()) for t, w in weights.items()}, index=df.index)
+
+
+def cell_means(pixels: pd.DataFrame, cells: pd.DataFrame, half_width: float) -> pd.DataFrame:
+    """Mean of fine pixels ('lat_lon' ids) falling inside each target cell (centre +- half_width)."""
+    px = cells_from_columns(pixels.columns)
+    out = {}
+    for cid, la, lo in zip(cells.index, cells["lat"], cells["lon"]):
+        inside = px.index[(np.abs(px["lat"] - la) <= half_width) & (np.abs(px["lon"] - lo) <= half_width)]
+        out[cid] = pixels[inside].mean(axis=1) if len(inside) else pd.Series(np.nan, index=pixels.index)
+    return pd.DataFrame(out, index=pixels.index)
