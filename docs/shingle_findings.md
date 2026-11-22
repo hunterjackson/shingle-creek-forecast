@@ -332,3 +332,9 @@ archive (live runs fill the last 1–2 days with MRMS; checked separately). Scri
   h4–h7 **over** by +0.9…+1.6 ft (GEFS had big Milton totals; ×1.35–1.45 scale amplified them); perfect
   rain −0.2…−0.7. Flood-day band coverage is poor (6 days) → bands under-represent storm-forecast risk.
 - Low water: clearly better than persistence at h1–h3; only marginally at h5–h7 (.104–.137 vs .111–.146).
+
+## 2026-11-21 — live rain path check (MRMS 24 h QPE ending 12Z, mapped to gridMET cells)
+- MRMS12 cell means vs gridMET at the model cell (2020-10..2025-02): daily corr .91 (vs .20 for a 1-day shift
+  → same 12Z–12Z day), bias scale gridMET/MRMS = 1.013.
+- Final-test artifact, 2024-01..2025-02 (417 days), ALL past rain from scaled MRMS instead of gridMET (worst case;
+  live runs only fill the last 1–2 days): MAE h1/h3/h7 .033/.123/.301 vs gridMET .033/.126/.303 → no degradation.
