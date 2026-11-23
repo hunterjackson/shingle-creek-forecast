@@ -26,8 +26,8 @@
       <h2 id="how-heading">How the forecast works</h2>
       <p>At low and moderate flows the creek's level is set by Lake Tohopekaliga a few miles downstream, so the forecast works out two things: how much water the creek will carry, and where the lake will sit. Flow starts from a rainfall–runoff model of the 180-square-mile basin, driven by gridded rainfall, radar for the most recent day or two, and NOAA's GEFS rain forecast for the week ahead.</p>
       <p>Machine-learning models then combine that with the morning gauge reading, the upstream gauge near Kissimmee, the levels of Lake Toho and East Lake Toho against their regulation schedule, and releases at structures S-59 and S-61. One model predicts the level directly; the other predicts flow and lake level and converts them to a creek level. The forecast is the average of the two.</p>
-      <p>The shaded likely range is set so the real level falls inside it about 80% of the time, judged against past forecasts that used the rain forecasts actually issued. Quiet days get a narrow range. When rain or a big change is forecast, a separate model estimates how wide the range should be, so it widens most when a forecast is likely to miss, as during floods.</p>
-      <p>Lake Kissimmee, Lake Okeechobee, groundwater wells, evaporation forecasts and the National Water Model were tested as extra inputs and left out because they didn't improve accuracy.</p>
+      <p>The shaded likely range is set so the real level falls inside it about 80% of the time, judged against past forecasts that used the rain forecasts actually issued. Quiet days get a narrow range. From day 2 on, when rain or a big change is forecast, a separate model estimates how wide the range should be, so it widens most when a forecast is likely to miss, as during floods. For day 1 the width depends only on how much change is forecast.</p>
+      <p>Lake Kissimmee, Lake Okeechobee, groundwater wells, evaporation forecasts, the National Water Model and the individual GEFS ensemble members were tested as extra inputs and left out because they didn't improve accuracy. Other model types (CatBoost, smaller-tree and linear-leaf LightGBM, an alternative rainfall–runoff model) were also tried; none beat the current pair.</p>
       <p class="disclaimer">This is an experimental, independent forecast, not an official one. For flood warnings, follow the <a href="https://www.weather.gov/mlb/">National Weather Service in Melbourne</a> and <a href="https://www.osceola.org/agencies-departments/emergency-management/">Osceola County Emergency Management</a>.</p>
     </section>
     <section class="panel" aria-labelledby="test-heading">
@@ -43,6 +43,15 @@
         </tbody>
       </table>
       <p class="note"><sup>*</sup>Scored on a 233-day sample that includes Hurricane Milton; on the same sample this forecast missed by 0.04 / 0.13 / 0.29 / 0.36 ft.</p>
+      <h3>Likely range on 2024–2026</h3>
+      <p class="lede">How often the real level landed inside the likely range, on the same unseen period with issued rain forecasts. Floods remain the hard case: the range covers more of them than it used to, but still fewer than 8 in 10.</p>
+      <table class="results">
+        <thead><tr><th scope="col">Days ahead</th><th scope="col">1</th><th scope="col">3</th><th scope="col">5</th><th scope="col">7</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">All days</th><td>78%</td><td>80%</td><td>80%</td><td>81%</td></tr>
+          <tr><th scope="row">Milton flood days (of 6)</th><td>3</td><td>4</td><td>1</td><td>4</td></tr>
+        </tbody>
+      </table>
     </section>
     <section class="panel" aria-labelledby="src-heading">
       <h2 id="src-heading">Data sources</h2>
