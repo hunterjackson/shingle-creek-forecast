@@ -159,3 +159,9 @@ Decision: production model unchanged; stages 2–4 not run because no stage-1 su
 threshold. The 2024–26 test period was not used. Open follow-ups (not part of this plan): GEFS ensemble members as an
 input (rain-forecast error is the larger half of day-7 error); a likely-range model with a width penalty, since CQR
 showed real flood-coverage gains.
+
+## Follow-ups (2026-11-23)
+- E tuned (E2_calmprod): passes the band rule on 1979–2023 OOF; in forecast mode and on the one-shot 2024–26 test it
+  improves days 3–7 (pinball −11…−14 %, Milton flood-day coverage 2→5 of 6 at h7, h7 coverage .76→.81) but lowers
+  day-1 flood coverage. Candidate for production at h ≥ 2. Details in shingle_findings.md.
+- GEFS individual members: every way of using them was worse than the ensemble-mean file. Ruled out.

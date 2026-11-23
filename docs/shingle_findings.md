@@ -437,3 +437,33 @@ Stages 2–4 skipped since no survivor can reach the adoption threshold; the tes
 **LightGBM confirmed against A–F.** The 0.5/0.5 blend is also confirmed: either member alone is 2–12 % worse.
 Consistent trade-off worth knowing: smoother learners (CatBoost depth 6, LightGBM with 15–31 leaves) are 2–7 % better on
 everyday and low-water days at h5–h7 but 3–8 % worse on flood days; the production settings (63 leaves) favour floods.
+
+## 2026-11-23 — follow-ups: tuned likely range (E2) and GEFS individual members
+Scripts: experiments/model_test/{bands2,fc,fc_bands,fc_final_bands,fetch_members,fc_members}.py; reports alongside.
+
+**Likely range.** Stage-1 E2 calibrated its bins on rows where the learned |residual| scale was in-sample (coverage .76).
+Cross-fitting the scale model fixes coverage; calm days were then over-covered (.82–.85, +25–33 % width), so calm days
+(|p50−stage| < .05) keep |p50−stage| bins calibrated on calm days only and other days use tail-edge bins on the learned
+scale (**E2_calmprod**; scale model = LightGBM l1 on 1979–2019 perfect-rain OOF residuals).
+
+| h1/h3/h5/h7 | coverage | flood-day coverage | calm width | pinball |
+|---|---|---|---|---|
+| 1979–2023 OOF, observed rain (n flood ≈ 100) prod → E2 | .80 → .80 | .57/.44/.40/.37 → .66/.74/.63/.54 | −2…−5 % | −11…−14 % |
+| 2020-10..2023 forecast mode (Ian, 14 d) | .78/.77/.79/.76 → .78/.77/.78/.76 | .43/.43/.64/.57 → .21/.71/.71/.64 | −6…+6 % | −7…−13 % |
+| **one-shot test 2024-01..2026-11** (Milton, 6 d) | .80/.82/.78/.76 → .80/.81/.80/.81 | 4/4/1/2 → 2/5/1/5 of 6 | −1…+6 % | −7…−14 % |
+Better at days 3–7 everywhere (proper score, flood coverage, h7 calibration). Day-1 flood coverage worse on both Ian and
+Milton (flood pinball still better: misses are near misses). Candidate for adoption at h ≥ 2; not yet in production.
+
+**GEFS individual members** (gep01–10, 00Z, 2020-10..2023-12, 1185 issue days; 2.5 MB cropped). Same OOF-by-year
+models and scales as production. % MAE vs production (GEFS 31-member mean file):
+| | all h4/h7 | flood ≥59 h3/h7 | low water h3/h7 |
+|---|---|---|---|
+| mean of 10 members as rain (control) | +2.8!/+4.8! | −2.1*/−2.4* | +0.4/+6.5! |
+| mean of per-member predictions | +4.8!/+6.5! | +12.6!/+11.2! | +14.9!/+39.5! |
+| median of per-member predictions | +1.5/+2.8 | +7.4!/+17.2! | −2.1*/−1.2 |
+| GR4J flow averaged over members (Jensen) | +1.6/+3.1 | −4.1*/−9.8* | +13.3!/+28.1! |
+| bands binned on member-prediction spread | pinball −1…−11 % | flood coverage .43/.43/.64/.57 → .14/.21/.50/.36 | |
+Nothing beats the ensemble-mean file; the smoother (more members) the rain input, the better — models trained on
+observed rain + per-lead scale already use the mean well, and member noise only hurts. GR4J member-averaging helps
+Ian's flood days but costs low water 13–28 %. **Ruled out; members 11–30 not fetched.** Ian crests unchanged (±0.05 ft)
+except per-member mean, which lowers h6–7 crests by 0.6–1.4 ft (worse).
