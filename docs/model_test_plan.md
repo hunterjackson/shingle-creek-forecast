@@ -1,7 +1,7 @@
 # Test plan: other model types
 
-Written 2026-11-23. Nothing in this plan has been run yet. Every "expected gain" below is an
-estimate with its basis stated, to be replaced by a measurement in stages 0–1.
+Written 2026-11-23. **Stages 0–1 were run the same day; results are at the end of this file** and in
+`shingle_findings.md`. The expected-gain column below is the estimate made before running, kept as written.
 
 ## Why this plan exists
 
@@ -138,3 +138,24 @@ against A–F" and the question is closed.
   slightly optimistic for the production model. Stage 3 is the fair comparison.
 - The expected-gain column is judgement. Stages 0 and 1 are small and cheap and replace most of it
   with measurements before any large item (C2, D) is started.
+
+## Results (2026-11-23)
+
+Harness, logs and reports: `experiments/model_test/` (`stage1_report.txt`, `stage1_bands.txt`).
+
+| # | Candidate | Expected | Measured (out-of-fold 1979–2023) | Outcome |
+|---|---|---|---|---|
+| A | Tuning: seed bag, blend weights, CatBoost, 10 LightGBM settings | 0–3 % | Seed bag −0.5…−0.9 % everywhere; others trade 2–7 % better everyday/low water for 3–8 % worse floods | Only the seed bag passes stage 1; far below the 5 % bar |
+| B | Stage model that can extrapolate | flood days at h5–7 −10…−30 % | Best: ridge-residual −2…−5 % on flood days at h5–7, but +3…+8 % worse at days 1–3; crest errors unchanged | Fail |
+| C1 | GR6J / refit GR4J | 3–8 % at h4–7 | −1…+1 % everyday, flood days mostly worse | Fail → C2 and D not run (gated) |
+| C2 | LSTM runoff simulator | 0–10 % | not run | Gate not met |
+| D | End-to-end LSTM | −10…+5 % | not run | Gate not met |
+| E | Quantile model for likely range | flood coverage to 60 %+, ≤ 20 % wider calm bands | Flood coverage +9…+12 points (h1, h5, h7), pinball −11…−16 %, calm width +30…+51 % at h3–7 | Fail on width rule |
+| F | Simpler lake model | ≤ 2–5 % low water | 1–5 % worse | Fail |
+
+Stage 0 noise floor (sd across 5 seeds): overall MAE 0.1–0.3 %, flood days 1.1–1.8 %, low water 0.5–0.9 %.
+
+Decision: production model unchanged; stages 2–4 not run because no stage-1 survivor can reach the adoption
+threshold. The 2024–26 test period was not used. Open follow-ups (not part of this plan): GEFS ensemble members as an
+input (rain-forecast error is the larger half of day-7 error); a likely-range model with a width penalty, since CQR
+showed real flood-coverage gains.

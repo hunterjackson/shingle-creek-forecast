@@ -395,3 +395,45 @@ knowledge of the future* as ceilings; all days and low-flow days (Q < 200 cfs, T
   ex-Ian. ⇒ correlation is event-driven and not exploitable. Plus costs: archive only 2018+ (≈60–110 GB to
   build training history; feature index changes per NWM version), extra live dependency. **Not adopted.**
   Likely source of the weak signal is NWM's GFS rain, i.e. information about forecast rain, not hydrology.
+
+## 2026-11-23 — model test plan, stages 0–1 (docs/model_test_plan.md; harness in experiments/model_test/)
+Out-of-fold 1979–2023, 3-year blocks, 7-day gap, observed future rain, morning readings, GR4J calibrated ≤2021.
+Test period not touched. Each run ~80 s on 8 cores (folds in parallel).
+
+**Stage 0 (noise floor).** Production reproduces the documented OOF reference (.054/.143/.234 at h1/h3/h7).
+Seed-to-seed sd of MAE: overall 0.1–0.3 %, flood days 1.1–1.8 %, low water 0.5–0.9 %.
+
+**Stage 1 (% change in MAE vs production; * / ! = paired 120-day block bootstrap 90 % CI excludes 0, better / worse).**
+| candidate | all h1/h3/h5/h7 | flood days ≥59 h1/h3/h5/h7 | low water h1/h3/h5/h7 |
+|---|---|---|---|
+| A seed bag (mean of 5 seeds) | −0.9*/−0.5*/−0.8*/−0.5* | −2.9*/−1.9*/−0.7*/+0.7! | −1.3*/−1.8*/−1.2/−0.9 |
+| A blend weight per day (nested; stage model .7/.5/.45/.4) | −1.3*/+0.1/0/0 | −3.3*/+0.6!/+0.2!/+0.2! | +1.3!/−0.1/−0.3/−0.6* |
+| A CatBoost (defaults, depth 6) | +1.5/−0.5/−2.6*/−2.9* | −2.0*/+2.9!/+4.9!/+7.1! | −0.9/−1.3/−4.9*/−7.1* |
+| A LightGBM random search, best of 10 (rs5: 15 leaves) | −0.3/−0.2/−1.6*/−2.2* | −3.3*/+1.3!/+5.3!/−0.5* | −3.9*/+0.5/−4.8*/−6.2* |
+| B linear-leaf trees (stage model) | −1.0*/−0.3/−0.3/−0.3 | −3.4*/−4.9*/0/−1.2* | +0.4/+0.4/+2.6!/+0.1 |
+| B monotone in forecast rain / GR4J change | +0.5!/+0.5/+0.6!/+0.3 | +0.9!/+1.6!/−1.4*/−3.1* | +0.2/+2.5/+4.6!/−0.5 |
+| B ridge base + LightGBM residual | +2.5!/+0.7!/−0.8/−0.7 | +8.1!/+1.3!/−2.1*/−4.7* | +2.7!/+4.0!/+0.2/−1.4 |
+| C1 GR6J (NSE) | +0.2/+0.6/−0.2/−0.1 | +4.0!/+2.1!/+4.3!/+3.8! | +0.7/+4.0!/+1.1/+0.8 |
+| C1 GR6J (NSE on √Q) | 0/−0.2/−1.1*/−0.4 | −1.5*/+0.2!/−2.7*/+3.1! | −1.1*/+0.9/+0.5/+0.2 |
+| C1 GR4J, x2 bound widened to −40 | 0/−0.3/−1.2*/−1.1* | +1.0!/+1.7!/+0.5!/+3.2! | −2.3*/+1.1/−1.0/−1.6 |
+| C1 GR4J (NSE on √Q / on log Q) | ≤ ±0.5 / up to +1.4 | mixed / +11…+15 % worse at h5–7 | ≤ ±3 |
+| F lake model ridge / ridge+LightGBM avg | +0.7…+1.7! / ≤ +0.3 | ≤ +0.5 | +2.8…+4.8! / +0.8…+1.8! |
+| (stage model alone / rating hybrid alone) | +1.5…+5.8! / +3.0…+12.1! | | |
+Crest error over the 15 (h3) / 14 (h7) scoreable floods (mean |err|): production .64 / 1.04; linear-leaf .64 / 1.01, ridge-residual .65 / 1.01,
+monotone .64 / 1.02, seed bag .66 / 1.08 — no candidate changes crests beyond ±0.05 ft on average.
+
+Simulators (calibrated ≤2021; flow NSE cal / val 2022–23): GR4J .66/.45; GR4J wide x2 .68/.54 (x1 → 1 mm, x2 −28);
+GR6J .67/.46; GR6J √Q .63/−.13. A better-fitting simulator did not translate into better stage forecasts.
+
+**Candidate E (likely range), on production OOF forecasts:** quantile LightGBM + conformal correction (CQR) keeps overall
+coverage .79–.80, raises flood-day coverage .57/.44/.40/.37 → .66/.45/.52/.49 (h1/h3/h5/h7) and cuts pinball loss 11–16 %
+(13–21 % on flood days), but calm-day width grows +14/+30/+40/+51 % — fails the ≤ 20 % limit at h3–h7. A learned-scale
+binned variant drops overall coverage to .76–.77 (below the 77 % floor).
+
+**Verdict.** Against the pre-registered stage-1 rule (beat production by > 2× seed noise on the target metric, no other
+metric worse by > noise) only the seed bag passes, at −0.5…−0.9 % — far below the adoption threshold (≥ 5 % at days 4–7
+or ≥ 15 % on flood days). Gates not met: C1 did not improve → C2 (LSTM simulator) and D (end-to-end LSTM) not run.
+Stages 2–4 skipped since no survivor can reach the adoption threshold; the test period stays unused.
+**LightGBM confirmed against A–F.** The 0.5/0.5 blend is also confirmed: either member alone is 2–12 % worse.
+Consistent trade-off worth knowing: smoother learners (CatBoost depth 6, LightGBM with 15–31 leaves) are 2–7 % better on
+everyday and low-water days at h5–h7 but 3–8 % worse on flood days; the production settings (63 leaves) favour floods.
