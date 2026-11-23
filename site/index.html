@@ -14,6 +14,10 @@
 <body>
   <header class="masthead">
     <p class="eyebrow">Shingle Creek at Campbell, FL · USGS 02264495 · NWS SHIF1</p>
+    <nav class="tabs" aria-label="Pages">
+      <a href="./" aria-current="page">Forecast</a>
+      <a href="how-it-works.html">How it works &amp; testing</a>
+    </nav>
   </header>
 
   <main>
@@ -49,6 +53,7 @@
         </ul>
       </div>
       <div id="hydro" class="hydro"></div>
+      <p class="note live-link">Latest official reading and NWS gauge page: <a href="https://water.noaa.gov/gauges/shif1">Shingle Creek at Campbell on water.noaa.gov</a></p>
       <details class="data-table">
         <summary>Show observed daily levels as a table</summary>
         <table><thead><tr><th scope="col">Date</th><th scope="col">Creek (ft)</th><th scope="col">Lake Toho (ft)</th></tr></thead><tbody id="obs-body"></tbody></table>
@@ -59,17 +64,6 @@
       <h2 id="record-heading">Track record</h2>
       <p class="lede">Every forecast is logged when it's issued and scored once the day has passed. The comparison is with the National Water Model, NOAA's nationwide forecast, which publishes day-1 flows for this creek.</p>
       <div id="record"></div>
-      <h3>Tested on 2024–2026 before going live</h3>
-      <p class="lede">Average miss in feet, on data the model never saw while it was built, using the rain forecasts that were actually issued each day. Persistence means assuming the level won't change.</p>
-      <table class="results">
-        <thead><tr><th scope="col">Days ahead</th><th scope="col">1</th><th scope="col">3</th><th scope="col">5</th><th scope="col">7</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">This forecast</th><td>0.03</td><td>0.14</td><td>0.26</td><td>0.32</td></tr>
-          <tr><th scope="row">Persistence</th><td>0.10</td><td>0.26</td><td>0.39</td><td>0.48</td></tr>
-          <tr><th scope="row">National Water Model<sup>*</sup></th><td>0.51</td><td>0.81</td><td>0.76</td><td>0.82</td></tr>
-        </tbody>
-      </table>
-      <p class="note"><sup>*</sup>Scored on a 233-day sample that includes Hurricane Milton; on the same sample this forecast missed by 0.04 / 0.13 / 0.29 / 0.36 ft.</p>
     </section>
 
     <section class="panel" aria-labelledby="raw-heading">
@@ -82,18 +76,11 @@
         <li><a href="https://raw.githubusercontent.com/hunterjackson/shingle-creek-forecast/main/site/data/forecast_log.csv">forecast_log.csv</a> — every forecast issued, one row per day ahead</li>
       </ul>
     </section>
-
-    <section class="panel how" aria-labelledby="how-heading">
-      <h2 id="how-heading">How the forecast works</h2>
-      <p>At low and moderate flows the creek's level is set by Lake Tohopekaliga a few miles downstream, so the forecast works out two things: how much water the creek will carry, and where the lake will sit. Flow starts from a rainfall–runoff model of the 180-square-mile basin, driven by gridded rainfall, radar for the most recent day or two, and NOAA's GEFS rain forecast for the week ahead.</p>
-      <p>Machine-learning models then combine that with the morning gauge reading, the upstream gauge near Kissimmee, the levels of Lake Toho and East Lake Toho against their regulation schedule, and releases at structures S-59 and S-61. One model predicts the level directly; the other predicts flow and lake level and converts them to a creek level. The forecast is the average of the two.</p>
-      <p>Lake Kissimmee, Lake Okeechobee, groundwater wells, evaporation forecasts and the National Water Model were tested as extra inputs and left out because they didn't improve accuracy.</p>
-      <p class="disclaimer">This is an experimental, independent forecast, not an official one. For flood warnings, follow the <a href="https://www.weather.gov/mlb/">National Weather Service in Melbourne</a> and <a href="https://www.osceola.org/agencies-departments/emergency-management/">Osceola County Emergency Management</a>.</p>
-    </section>
   </main>
 
   <footer class="footer">
-    <p>Data: <a href="https://waterdata.usgs.gov/monitoring-location/02264495/">USGS</a> · <a href="https://www.sfwmd.gov/science-data/dbhydro">SFWMD DBHYDRO</a> · <a href="https://www.climatologylab.org/gridmet.html">gridMET</a> · <a href="https://mesonet.agron.iastate.edu/">IEM MRMS archive</a> · <a href="https://registry.opendata.aws/noaa-gefs/">NOAA GEFS</a> · <a href="https://water.noaa.gov/">NOAA NWPS</a></p>
+    <p class="disclaimer foot-disclaimer">Experimental, independent forecast, not an official one. For flood warnings, follow the <a href="https://www.weather.gov/mlb/">National Weather Service in Melbourne</a> and <a href="https://www.osceola.org/agencies-departments/emergency-management/">Osceola County Emergency Management</a>.</p>
+    <p>Data sources and how the forecast is built: <a href="how-it-works.html">How it works &amp; testing</a></p>
     <p id="generated"></p>
     <p><a href="#raw-heading">Raw data</a> · <a href="https://github.com/hunterjackson/shingle-creek-forecast">Source on GitHub</a></p>
   </footer>

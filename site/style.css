@@ -205,3 +205,15 @@ a:hover { color: var(--fc); }
   .week th, .week td { padding-right: 6px; }
   .panel { padding: 20px 16px 18px; border-radius: 8px; }
 }
+
+/* ---------- tabs + secondary page ---------- */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 14px 0 0; border-bottom: 1px solid var(--border); }
+.tabs a { padding: 8px 0 9px; margin-bottom: -1px; text-decoration: none; color: var(--ink-2); font: 600 15px/1.3 var(--font); border-bottom: 2px solid transparent; }
+.tabs a:hover { color: var(--ink); }
+.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--fc); }
+.page-title { margin: 28px 0 18px; font: 800 clamp(28px, 4vw, 40px)/1.15 var(--font); letter-spacing: -0.02em; }
+.live-link { margin-top: 12px; }
+.sources { margin: 0; padding-left: 20px; color: var(--ink-2); }
+.sources li { margin: 8px 0; max-width: 72ch; }
+.sources a { font-weight: 600; color: var(--ink); }
+.foot-disclaimer { margin: 0 0 14px; font-size: 14px; color: var(--ink) !important; }
