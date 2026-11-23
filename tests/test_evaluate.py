@@ -165,3 +165,27 @@ def test_binned_conformal_band_always_contains_point_forecast():
     lo, hi = bc.offsets(np.linspace(0, 5, 50))
 
     assert (lo <= 0).all() and (hi >= 0).all()
+
+
+def test_binned_conformal_fit_edges_bins_at_given_scale_quantiles():
+    rng = np.random.default_rng(11)
+    scale = rng.uniform(0, 1, 20000)
+    resid = rng.normal(0, 0.05 + scale)
+
+    bc = evaluate.BinnedConformal.fit_edges(pd.Series(resid), pd.Series(scale), [0.5, 0.9], coverage=0.8)
+
+    np.testing.assert_allclose(bc.edges, np.quantile(scale, [0.5, 0.9]))
+    s2 = rng.uniform(0, 1, 20000)
+    r2 = rng.normal(0, 0.05 + s2)
+    lo, hi = bc.offsets(s2)
+    top = s2 > np.quantile(s2, 0.9)
+    assert 0.75 < ((r2 >= lo) & (r2 <= hi))[top].mean() < 0.85
+
+
+def test_binned_conformal_fit_edges_merges_bins_below_min_count():
+    rng = np.random.default_rng(12)
+    scale = rng.uniform(0, 1, 1000)
+
+    bc = evaluate.BinnedConformal.fit_edges(pd.Series(rng.normal(0, 1, 1000)), pd.Series(scale), [0.5, 0.98], min_count=60)
+
+    assert len(bc.edges) == 1  # the top 2 % bin (20 rows) is merged away

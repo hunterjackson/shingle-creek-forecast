@@ -4,6 +4,10 @@ train(): GR4J calibrated on the training period -> simulated states as features;
 spec.build_model() fit on observed rain; per-lead GEFS scale fitted on the GEFS
 era inside training; conformal bands calibrated on *forecast-mode* predictions
 (issued GEFS rain), optionally out-of-fold by year so they are honest.
+
+With oof_years, horizons >= LEARNED_BANDS_FROM_H get learned-width bands (shingle.bands): the width model is fit on
+out-of-fold perfect-rain residuals of the training years before fcst_start (blocks of scale_block_years), the bins
+on the forecast-mode OOF residuals. Day 1 keeps |p50 - stage| bins (learned bands lowered its flood coverage).
 """
 
 from __future__ import annotations
@@ -14,11 +18,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from shingle import config, dataset, fcst, gr4j_driver, live, spec
+from shingle import bands, config, dataset, fcst, gr4j_driver, live, spec
 from shingle.evaluate import BinnedConformal
 from shingle.models.base import HORIZONS, targets
 
 SCALED_FROM_H = 4
+LEARNED_BANDS_FROM_H = 2
 
 
 @dataclass
@@ -52,9 +57,36 @@ def _set_bands(model, preds: pd.DataFrame, data: dict, index: pd.DatetimeIndex) 
         model.bands[h] = BinnedConformal.fit(y[f"h{h}"] - p50, model.band_scale(data, index, p50, h), model.n_bins, model.coverage)
 
 
+def perfect_oof(data: dict, tr: pd.DatetimeIndex, held_index: pd.DatetimeIndex, horizons, block_years: int = 3, gap_days: int = 7) -> pd.DataFrame:
+    """Out-of-fold point predictions (observed future rain) for held_index, in blocks of calendar years; each block's
+    model is fit on the rest of tr minus the gap_days before the block."""
+    years = sorted(set(held_index.year))
+    parts = []
+    for i in range(0, len(years), block_years):
+        blk = years[i : i + block_years]
+        held = held_index[held_index.year.isin(blk)]
+        start = pd.Timestamp(f"{blk[0]}-01-01")
+        fit_ix = tr[~tr.year.isin(blk) & ~((tr < start) & (tr >= start - pd.Timedelta(days=gap_days)))]
+        m = spec.build_model(horizons)
+        m.a.fit(data, fit_ix)
+        m.b.fit(data, fit_ix)
+        parts.append(m.point(data, held))
+    return pd.concat(parts).sort_index()
+
+
+def _set_learned_bands(model, data, tr, pre, d_fc, fc_idx, preds_fc, horizons, block_years, gap_days) -> None:
+    po = perfect_oof(data, tr, pre, horizons, block_years, gap_days)
+    y_pre = targets(data["stage"], horizons).loc[po.index]
+    y_fc = targets(d_fc["stage"], horizons).loc[fc_idx]
+    for h in horizons:
+        sm = bands.LearnedBand.fit_scale(data, po.index, po[f"h{h}"], y_pre[f"h{h}"] - po[f"h{h}"], h)
+        p50 = preds_fc.loc[fc_idx, f"h{h}"]
+        model.bands[h] = bands.LearnedBand.fit(sm, d_fc, fc_idx, p50, y_fc[f"h{h}"] - p50, h, model.coverage)
+
+
 def train(
     hist: dict, raw: pd.DataFrame, src: pd.DataFrame, train_end: str, fcst_start: str = "2020-10-01",
-    horizons=HORIZONS, gr4j_maxiter: int = 100, oof_years: bool = True, gap_days: int = 7,
+    horizons=HORIZONS, gr4j_maxiter: int = 100, oof_years: bool = True, gap_days: int = 7, scale_block_years: int = 3,
 ) -> Artifact:
     horizons = tuple(horizons)
     base_data = dataset.build_data(hist)
@@ -81,7 +113,12 @@ def train(
             m.a.fit(data, tr[tr.year != yr])
             m.b.fit(data, tr[tr.year != yr])
             parts.append(m.point(d_fc, held))
-        _set_bands(model, pd.concat(parts), d_fc, fc_idx)
+        preds_fc = pd.concat(parts)
+        _set_bands(model, preds_fc, d_fc, fc_idx)
+        learned = [h for h in horizons if h >= LEARNED_BANDS_FROM_H]
+        pre = tr[tr < pd.Timestamp(fcst_start)]
+        if learned and len(pre):
+            _set_learned_bands(model, data, tr, pre, d_fc, fc_idx, preds_fc, learned, scale_block_years, gap_days)
     else:
         model.calibrate(d_fc, fc_idx)
 

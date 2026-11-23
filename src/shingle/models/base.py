@@ -65,6 +65,10 @@ class ConformalBandsMixin:
         out = {}
         for h in self.horizons:
             p50 = pred[f"h{h}"]
-            lo, hi = self.bands[h].offsets(self.band_scale(data, index, p50, h).to_numpy())
+            band = self.bands[h]
+            if hasattr(band, "offsets_for"):  # learned-width band (shingle.bands.LearnedBand)
+                lo, hi = band.offsets_for(data, index, p50)
+            else:
+                lo, hi = band.offsets(self.band_scale(data, index, p50, h).to_numpy())
             out[f"h{h}_p10"], out[f"h{h}_p50"], out[f"h{h}_p90"] = p50 + lo, p50, p50 + hi
         return pd.DataFrame(out, index=index)[forecast_columns(self.horizons)]

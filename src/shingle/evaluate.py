@@ -135,8 +135,13 @@ class BinnedConformal:
 
     @classmethod
     def fit(cls, residuals: pd.Series, scale: pd.Series, n_bins: int = 5, coverage: float = 0.8, min_count: int = 60) -> "BinnedConformal":
+        return cls.fit_edges(residuals, scale, np.linspace(0, 1, n_bins + 1)[1:-1], coverage, min_count)
+
+    @classmethod
+    def fit_edges(cls, residuals, scale, quantiles, coverage: float = 0.8, min_count: int = 60) -> "BinnedConformal":
+        """As fit(), with bin edges at the given quantiles of the scale (e.g. dedicated tail bins)."""
         df = pd.concat([pd.Series(np.asarray(residuals, float)), pd.Series(np.asarray(scale, float))], axis=1, keys=["r", "s"]).dropna()
-        qs = np.unique(np.quantile(df["s"], np.linspace(0, 1, n_bins + 1)[1:-1])) if len(df) else np.array([])
+        qs = np.unique(np.quantile(df["s"], quantiles)) if len(df) else np.array([])
         edges = list(qs)
         # merge sparse bins
         while edges:

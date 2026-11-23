@@ -69,3 +69,40 @@ def test_backtest_matches_single_day_predict(trained):
     assert list(bt.columns) == base.forecast_columns(H)
     one = train.predict(art, hist, raw, src, issue_day=days[3])
     np.testing.assert_allclose(bt.loc[days[3], [f"h{h}_p50" for h in H]].to_numpy(float), one["p50"].to_numpy(float))
+
+
+@pytest.fixture(scope="module")
+def trained_oof():
+    hist, raw, src = make_world(n_days=6 * 365, start="2016-01-01")
+    data = dataset.build_data(hist)
+    idx = data["stage"].index
+    art = train.train(hist, raw, src, train_end=str(idx[5 * 365].date()), fcst_start=str(idx[3 * 365].date()), horizons=H,
+                      gr4j_maxiter=15, oof_years=True, scale_block_years=1)
+    return hist, raw, src, art
+
+
+def test_oof_training_uses_learned_bands_from_day_two(trained_oof):
+    from shingle import bands
+    from shingle.evaluate import BinnedConformal
+
+    hist, raw, src, art = trained_oof
+
+    assert isinstance(art.model.bands[1], BinnedConformal)
+    assert all(isinstance(art.model.bands[h], bands.LearnedBand) for h in H if h >= train.LEARNED_BANDS_FROM_H)
+    day = pd.Timestamp(hist["gauge"].index[5 * 365 + 30])
+    fc = train.predict(art, hist, raw, src, issue_day=day)
+    assert (fc["p10"] <= fc["p50"]).all() and (fc["p50"] <= fc["p90"]).all()
+    assert (fc["p90"] - fc["p10"] > 0).all()
+
+
+def test_learned_bands_survive_save_and_backtest_matches_predict(trained_oof, tmp_path):
+    hist, raw, src, art = trained_oof
+    train.save(art, tmp_path / "m.pkl")
+    art2 = train.load(tmp_path / "m.pkl")
+    idx = hist["gauge"].index
+    days = idx[5 * 365 + 40 : 5 * 365 + 45]
+
+    bt = train.backtest(art2, hist, raw, src, days)
+    one = train.predict(art, hist, raw, src, issue_day=days[2])
+
+    np.testing.assert_allclose(bt.loc[days[2], [f"h{h}_p90" for h in H]].to_numpy(float), one["p90"].to_numpy(float))
