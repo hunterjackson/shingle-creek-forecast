@@ -2,7 +2,7 @@
 
 A 7-day water level forecast for **Shingle Creek at Campbell, FL** (USGS 02264495, NWS SHIF1), refreshed every three hours by GitHub Actions.
 
-- **Site:** https://hunterjackson.github.io/shingle-creek-forecast/
+- **Site:** https://shinglecreek.fyi/
 - **Raw data** (updated by every run):
   - [`site/data/forecast.json`](https://raw.githubusercontent.com/hunterjackson/shingle-creek-forecast/main/site/data/forecast.json): current reading plus 7 days of expected level, likely range (p10–p90), flood category and forecast rain
   - [`site/data/observed.json`](https://raw.githubusercontent.com/hunterjackson/shingle-creek-forecast/main/site/data/observed.json): 45 days of daily creek and Lake Toho levels, 10 days of hourly creek levels
