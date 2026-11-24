@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: shingle-pipeline
@@ -21,9 +19,6 @@ jobs:
   forecast:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -79,5 +74,20 @@ jobs:
         with:
           path: site
 
+  # Deploy runs as its own job: deploy-pages looks the artifact up through the API,
+  # and querying in the same job less than a second after the upload sometimes found
+  # nothing ("No artifacts named github-pages"). Starting a new job gives it time to
+  # show up.
+  deploy:
+    needs: forecast
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v5
