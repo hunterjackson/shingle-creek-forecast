@@ -1,7 +1,7 @@
 # Plan: teach the model how far to trust the rain forecast
 
-Written 2026-11-25, after the divergence work (`divergence_test_plan.md`). Nothing here has been run yet
-except the fact checks listed under "Review".
+Written 2026-11-25, after the divergence work (`divergence_test_plan.md`). Phase 0 is done (results and the
+frozen scoring below); Phase 1 onward has not been run.
 
 ## Why
 
@@ -26,8 +26,8 @@ today's GEFS for every day of 2000–2019 (00Z, 5 members). With the live archiv
 - **The trade-off to watch.** A model trained on forecasts hedges: it responds less to forecast rain. That
   lowers average error and also lowers flood forecasts, which is exactly how NBM failed. So floods are
   scored on their own, and the upper range (p90) is trained to carry the flood risk the p50 gives up.
-- **A gain that does not depend on the new model.** 24 years of forecast-mode residuals, with 13 flood
-  events instead of 2, to calibrate the likely range. Flood coverage is the range's known weak point.
+- **A gain that does not depend on the new model.** 24 years of forecast-mode residuals, with 12 flood
+  events instead of 1 (Ian; Milton is in the final test), to calibrate the likely range. Flood coverage is the range's known weak point.
 
 ## Review: what changed from the first version of this plan
 
@@ -79,7 +79,7 @@ All run in forecast mode on 2000–2026. A is today's model; the rest are new.
 
 | | What | Why |
 |---|---|---|
-| A | Production as is, fed reforecast rain | Baseline, now with 13 flood events in forecast mode |
+| A | Production as is, fed reforecast rain | Baseline, now with 12 flood events in forecast mode |
 | A+ | A, with range and per-lead scale calibrated on 24 years | Low-risk gain, independent of B–D |
 | B | Same model spec retrained on 2000+ with forecast rain in place of observed future rain | The plain "train on forecasts" idea; expected to lose at low water |
 | C | Keep A. A second small model, trained on 2000+, takes A's forecast, A's forecast with zero future rain, the forecast rain by lead, and the creek state, and outputs the stage | Learns how far to trust the forecast while keeping the 47-year model's knowledge |
@@ -97,22 +97,80 @@ updated, site text updated.
 
 2018-08 onward, as one more input to the layer. Only if Phase 3 shows the layer is limited by lead-1 rain.
 
-## Scoring, frozen before Phase 1
+## Phase 0 results (2026-11-25)
 
-- **Folds.** 3-year blocks over 2000–2023 with 7-day gaps; each block is forecast by models that never saw it.
-- **The deployment test.** One fold trains on reforecast years only and is scored on 2020-10..2023-12 with
-  live GEFS. That is the real condition (train on reforecast, run on live) and must pass on its own.
-- **Final look.** 2024-01..2026-11, once, for one frozen candidate. It has been used before (model choice,
-  two range checks), so it confirms rather than selects.
+### 0a — price of a 5-member mean (`experiments/reforecast/p0_members.py`, `p0_members_report.txt`)
 
-| Use | Metric | Gate for adoption |
+Today's model in forecast mode, 2020-10..2023-12 (1,182 days). The 5-member mean is a stand-in made from
+cached p01–p05 (no control member is cached). Scale refit to the 5-member mean:
+
+| MAE change vs 31-member mean | d1 | d2 | d3 | d4 | d5 | d6 | d7 |
+|---|---|---|---|---|---|---|---|
+| All days | +1.7 % | +0.9 % | +1.7 % | +3.3 % | +4.5 % | +5.1 % | +6.5 % |
+| Rainy days | +5.4 % | +1.8 % | +2.4 % | +3.9 % | +5.3 % | +5.8 % | +6.9 % |
+| 10-member mean, all days | 0.0 % | +0.3 % | +0.4 % | +2.8 % | +2.7 % | +3.8 % | +4.8 % |
+
+The 90 % CI excludes 0 at days 1 and 3–7. Lead-1 rain skill barely changes (Spearman 0.777 vs 0.788 for the
+31-member mean). The cost grows with lead time, where 31 members average out more noise. Flood days (14, all Ian)
+look better with 5 members, but that is noise. This is an upper bound: a model *trained* on 5-member rain
+learns that noise.
+
+**Decision.** The 31-member mean is worth up to ~6 % at days 4–7, so it is not given up. Live, the base model A
+keeps the 31-member mean. The 5 members feed only the new layer (C/D) as extra inputs, and in training years A
+runs on the 5-member mean, the only option. The deployment-test fold (2020–23) scores exactly this arrangement.
+Every candidate is compared with **production on the 31-member mean**, so it has to overcome the handicap.
+
+### 0b — frozen scoring
+
+Fixed 2026-11-25, before any reforecast data has been downloaded or looked at.
+
+**Data periods**
+
+| Period | Rain forecasts | Use |
 |---|---|---|
-| Everyday | MAE by day ahead | Not worse overall (90 % CI) |
-| Rainy days | MAE on days with ≥ 5 mm forecast | ≥ 5 % better at days 2–5, CI excluding 0 |
-| Confident busts | MAE on days with ≥ 20 mm forecast and < 10 mm observed | Reported; expected to improve most |
-| Floods (13 events, 2000–2023) | Crest error and timing per event; hit and false-alarm rate for ≥ 59 ft, for p50 and for p90 | p50 crest error not worse on average; p90 hit rate not lower |
-| Low water | MAE on days ≤ 52.48 ft | Not worse |
-| Likely range | Coverage overall, rainy days, flood days; pinball loss | Coverage ≥ today's on each; pinball not worse |
+| 2000-01-01..2019-12-31 | Reforecast, 5 members | Training and out-of-fold scoring |
+| 2020-01-01..2020-09-30 | None (between archives) | Excluded |
+| 2020-10-01..2023-12-31 | Live GEFS (31-member mean; c00 + p01–p04 for the layer) | Deployment-test fold |
+| 2024-01-01..2026-11-12 | Live GEFS | Final look, once, one frozen candidate |
+
+**Folds.** Reforecast years in blocks 2000–02, 03–05, 06–08, 09–11, 12–14, 15–17, 18–19. Each block is
+predicted by models trained on the other blocks, with a 7-day gap at both edges. The **deployment-test fold**
+predicts 2020-10..2023-12 with models trained on reforecast years only, fed live inputs. The base model A
+keeps its own long-record training (perfect rain, OOF as now); only the new layer follows these folds.
+
+**Flood events.** `experiments/reforecast/flood_events.csv`, generated by `p0_events.py`: runs of daily
+stage ≥ 59 ft, merged when less than 7 days apart. This keeps the 2004 hurricanes, separated by 8-day dips, as
+three events. 11 events in 2000–2019 (2001-09, 2002-06, 2002-12, 2003-01, 2003-08, Charley, Frances, Jeanne,
+2009-05, 2011-10, Irma), Ian in the deployment fold, and Milton in the final test. Scoring window: first day − 7
+to last day + 3.
+
+**Definitions**
+
+- *Rainy day* for horizon h: basin-areal 5-member-mean rain over leads 1..h ≥ 5 mm (the same members in every period).
+- *Confident bust*: lead-1 basin 5-member-mean rain ≥ 20 mm and observed gridMET basin rain on t+1 < 10 mm.
+- *Low water*: observed stage at t+h ≤ 52.48 ft.
+- *Crest error* (per event, per horizon h): max p50 over the target days in the window (each issued h days
+  earlier) minus the observed crest. *Timing error*: the date of that max minus crest_date.
+- *Event hit* (per event, per h): any target day in the window with p50 (or p90) ≥ 59 ft.
+- *False alarm event*: a run of target days with forecast ≥ 59 ft that touches no event window, counted per h.
+- *Paired CI*: moving-block bootstrap, 60-day blocks, 2,000 resamples, 90 % (`fc.boot`).
+
+**Gates** (candidate vs production on the 31-member mean; production gets the 5-member mean in 2000–2019, where nothing else exists)
+
+| # | Use | Gate |
+|---|---|---|
+| G1 | All days | At no horizon 1–7 is the candidate significantly worse (lo90 of MAE diff > 0) |
+| G2 | Rainy days | MAE ≥ 5 % better at each of days 2–5, with hi90 < 0 |
+| G3 | Floods (11 + Ian) | Mean \|crest error\| of p50 not worse by > 0.05 ft at days 1–5; p90 event hits ≥ production's at every h |
+| G4 | Low water | At no horizon is the candidate significantly worse |
+| G5 | Likely range | Coverage overall ≥ production − 1 pt; rainy and flood-day coverage ≥ production; pinball ≤ production + 1 % |
+
+- The **out-of-fold reforecast years** must pass G1–G5.
+- The **deployment-test fold** must pass G1, G2, G4 and G5 on its own. Ian is reported, not gated.
+- Confident busts and timing errors are reported, not gated.
+- **Selection** uses only the out-of-fold years and the deployment fold. One candidate is then frozen and scored
+  once on 2024-01..2026-11 (G1 and G2 point estimates and Milton reported). It is adopted if those hold.
+- Phase 1a's rain-statistics gate stays as written above (ratio within ~15 %, Spearman within ~0.05 of live).
 
 ## Risks
 
