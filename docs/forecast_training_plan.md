@@ -1,7 +1,8 @@
 # Plan: teach the model how far to trust the rain forecast
 
 Written 2026-11-25, after the divergence work (`divergence_test_plan.md`). Phase 0 is done (results and the
-frozen scoring below); Phase 1 onward has not been run.
+frozen scoring below). Phase 1 is done: rank skill matches, but the rain-total gate fails (reforecast ~20 % wetter
+at leads 1, 3, 4). Whether to continue is an open decision (Phase 1 results).
 
 ## Why
 
@@ -171,6 +172,56 @@ to last day + 3.
 - **Selection** uses only the out-of-fold years and the deployment fold. One candidate is then frozen and scored
   once on 2024-01..2026-11 (G1 and G2 point estimates and Milton reported). It is adopted if those hold.
 - Phase 1a's rain-statistics gate stays as written above (ratio within ~15 %, Spearman within ~0.05 of live).
+
+## Phase 1 results (2026-11-25)
+
+Pulled c00 for 2004, 2013 (quiet year: no day >= 59 ft, full gauge record, typical mean stage) and 2017: ~9 GB
+transferred, 1.8 MB kept. Live c00 2020-10..2023-12 for the yardstick: 3.5 GB. Scripts `p1_fetch.py`,
+`p1_analyze.py`, `p1_checks.py`; reports `p1_report.txt`, `p1_checks_report.txt`.
+
+### 1a — same forecast system? Gate fails on rain totals, passes on rank skill
+
+| Lead | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| obs/fc, reforecast c00 (3 years) | 1.17 | 1.28 | 1.26 | 1.37 | 1.52 | 1.40 | 1.42 |
+| obs/fc, live c00 (2020-10..2023-12) | 1.50 | 1.44 | 1.56 | 1.65 | 1.48 | 1.46 | 1.60 |
+| difference (gate ±15 %) | **−22 %** | −11 % | **−19 %** | **−17 %** | +2 % | −4 % | −11 % |
+| Spearman, reforecast − live (gate ≥ −0.05) | −0.01 | +0.01 | +0.03 | +0.03 | +0.06 | +0.03 | +0.06 |
+
+- **Ranking of rain days: same.** The reforecast picks wet days as well as live does, at every lead.
+- **Totals: the reforecast is ~20 % wetter relative to gridMET at short leads.** It under-forecasts less. Not
+  year-to-year noise: at leads 1 and 3 every pilot year (1.05–1.33) is below every live year (1.40–1.70);
+  at lead 2 the ranges just touch.
+- **Not resolution.** Live GEFS at 0.25° and 0.5° give the same lead-1 totals (ratio 0.99).
+- Likely cause: reforecast runs start from a reanalysis, live runs from the operational analysis (the risk
+  listed below). A drift in gridMET between eras cannot be ruled out with this data.
+- **By the frozen rule the plan stops here.** The difference is a level shift (a per-lead factor), not a loss of
+  skill, so it could be corrected by rescaling reforecast rain to the live level, with the deployment-test fold
+  (train on reforecast, score on live) as the judge of whether that transfers. That would be a change to a
+  frozen gate and needs an explicit decision.
+
+### 1b — production model in forecast mode on the pilot years (OOF by year, 1,031 issue days)
+
+All-day MAE (ft) with observed future rain (perfect), c00 forecast, and no future rain (zero):
+
+| Day | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| perfect | 0.054 | 0.130 | 0.185 | 0.230 | 0.268 | 0.297 | 0.318 |
+| c00 | 0.058 | 0.138 | 0.210 | 0.292 | 0.363 | 0.426 | 0.485 |
+| zero | 0.058 | 0.164 | 0.262 | 0.356 | 0.437 | 0.512 | 0.581 |
+| share of perfect-rain gain recovered | 22 % | 75 % | 68 % | 51 % | 44 % | 40 % | 37 % |
+
+- **Day 1: rain forecast is worth nothing** (as T6 found). Days 2–3 recover most of the gain; days 5–7 under half.
+- **Floods** (Charley, Frances, Jeanne, Irma): mean |crest error| at days 3 / 4 / 5 is 0.44 / 1.11 / 1.84 ft with
+  c00 vs 0.15 / 0.69 / 0.84 ft with perfect rain. Every event is hit (p50 ≥ 59) at every horizon by every source.
+  Most of the c00 excess is over-forecasting Frances (c00 forecast 139 mm for 09-05, 107 mm fell) and Jeanne at
+  days 4–7, but the model overshoots Frances at days 5–7 even with perfect rain (+1.6 to +3.2 ft).
+- **Low water: forecast rain makes it worse than assuming none** (day 7 MAE 0.53 c00 vs 0.37 zero), but perfect rain
+  is also biased high there (+0.24 ft at day 7) while zero is unbiased. Part of this is the model at low water, not
+  the rain forecast.
+- **Era-matched scale** (per-lead scale refit on the reforecast, leave-one-pilot-year-out, ~1.2–1.5 vs live's
+  ~1.45–1.53): days 4–7 MAE 3–5 % lower than with live's scale; days 1–3 unchanged (raw rain there).
+- Room for the layer, rainy days: c00 vs perfect MAE is 0.386 vs 0.319 at day 3 and 0.560 vs 0.391 at day 5.
 
 ## Risks
 
