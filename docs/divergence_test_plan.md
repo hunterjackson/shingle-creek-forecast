@@ -184,3 +184,31 @@ MAE at days 4 / 7 (all days; flood obs ≥ 59 ft, 14 days of one event; low wate
 
 `pipeline.forecast_rain` now reports the issued GEFS basin rain without the per-lead scale. The model
 inputs are unchanged. The 11-24 issue would have shown 38 mm for 11-25 instead of 52.5 mm.
+
+### T2 development (run 2026-11-25) — `t2_bands.py`, `t2_report.txt`
+
+Forecast-mode OOF 2020-10..2023-12, all bands calibrated leave-one-year-out. "Wet" means the issued GEFS
+basin rain summed over leads 1..h is ≥ 5 mm (a fixed choice, not tuned). Flood is 14 days, all from Ian.
+
+| Day | Band | cov all | cov dry | cov wet 5–20 | cov wet ≥ 20 | cov flood | width all | pinball |
+|---|---|---|---|---|---|---|---|---|
+| 1 | production | 78 % | 81 % | 64 % (161) | 23 % (13) | 6/14 | 0.093 | 0.0102 |
+| 1 | learned (E2) | 78 % | 80 % | 67 % | 31 % | 3/14 | 0.094 | 0.0095 |
+| 1 | wet split, dry recalibrated | 78 % | 78 % | 78 % | 69 % | 3/14 | 0.097 | 0.0098 |
+| 1 | **wet_add** | 81 % | 81 % | 78 % | 69 % | 5/14 | 0.107 | 0.0097 |
+| 3 | production | 77 % | 84 % | 71 % (379) | 59 % (119) | 71 % | 0.438 | 0.0440 |
+| 3 | **wet_add** | 82 % | 84 % | 81 % | 76 % | 71 % | 0.514 | 0.0424 |
+| 5 | production | 78 % | 85 % | 78 % | 64 % | 71 % | 0.754 | 0.0668 |
+| 5 | wet_add | 81 % | 85 % | 84 % | 65 % | 64 % | 0.808 | 0.0674 |
+| 7 | production | 76 % | 90 % | 79 % | 62 % | 64 % | 0.957 | 0.0919 |
+| 7 | wet_add | 80 % | 90 % | 84 % | 66 % | 64 % | 1.011 | 0.0902 |
+
+wet_add keeps every dry day on the production band. Wet days get their own conformal bins on the learned
+|residual| scale, calibrated on wet days only (tertile edges).
+
+- Recalibrating dry days without the wet days narrows their band, and Ian's flood days fall in the dry group
+  at lead 1. That is why the plain wet split loses flood coverage; wet_add avoids it.
+- At days 1 and 3, wet_add fixes the wet-day shortfall and improves pinball by 4–5 %. Days 5–7 gain little,
+  because production's learned band already includes forecast rain.
+- **Frozen candidate:** wet_add for days 1–3 (day 2 by interpolation; the width models exist for days 1/3/5/7
+  in the harness), WET = 5 mm. Next: one look at 2024-01..2026-11-12, then implement if it holds.

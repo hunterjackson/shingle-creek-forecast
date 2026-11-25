@@ -2,3 +2,6 @@ oof/
 sims/
 data.pkl
 catboost_info/
+fc_data.pkl
+fc_models/
+fc_*.parquet
