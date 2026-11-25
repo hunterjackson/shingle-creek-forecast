@@ -391,3 +391,21 @@ is +0.06 at day 1 and −0.09 at day 3. **Dropped.**
 - GEFS stays the input; the rain-aware range carries its uncertainty.
 - An untested candidate is ECMWF. Its open-data archive only starts around 2023, too short for an honest backtest
   now, so it would need to be logged forward and evaluated later.
+
+**Step 4: combining forecasts into one input** (`combo_screen.py`). A small model predicting observed lead-1 rain
+from GEFS + NBM (log-linear, leave-one-year-out) is the best *rain* forecast tested: Spearman 0.70, lowest MAE.
+As a stage-model input it still scores +2 to +5 % overall and is worse on heavy days, though it cuts GEFS-bust errors
+by 7–28 %. A gate version (GEFS amount × NBM chance of rain) is neutral. Every source captures only ~40 % of the
+rain on days with ≥ 20 mm observed, so anything that trims false alarms also trims floods.
+
+**Step 5: training on forecast data, short-record version** (`corrector_screen.py`). A residual corrector is trained
+on the production blend's forecast-mode errors 2020–23 (leave-one-year-out). Its inputs are GEFS lead rain, the
+p50 change, state and season. It is worse everywhere: ridge +6 to +16 %; LightGBM with 7 leaves +0.3 to +6 %, and
+worse on GEFS busts too. **Three years of forecasts is enough to evaluate, not to learn from.** Each year's
+rain-forecast errors differ from the others'.
+
+**Remaining route: the GEFSv12 reforecast** (2000–2019, same model, 00Z daily, 5 members; AWS
+`noaa-gefs-retrospective`). It gives about 23 years of forecasts, including the 2004 hurricanes, Fay 2008 and Irma
+2017, so the stage models could be trained on forecast rain (alone, or alongside observed). Rain comes as global
+0.25° 6-h fields of ~300 KB: ~60 GB for the control member over leads 1–7, ~300 GB for a 5-member mean.
+Production would then use the same 5-member mean from the operational members, so training and live inputs match.
