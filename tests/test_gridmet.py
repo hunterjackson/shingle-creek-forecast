@@ -79,3 +79,14 @@ def test_fetch_raises_on_http_error():
     )
     with pytest.raises(httpx.HTTPStatusError):
         asyncio.run(gridmet.fetch("pr", BBOX, start="2024-01-01", end="2024-01-02"))
+
+
+@respx.mock
+def test_fetch_returns_empty_when_the_window_is_not_published_yet():
+    """gridMET lags 1-2 days; THREDDS answers 400 when time_start is past the dataset's last day. The 3-hourly
+    update asks for 'days after the last cached one' (cache.update_daily), so that must mean 'nothing new yet'."""
+    respx.get(url__startswith="http://thredds.northwestknowledge.net").mock(
+        return_value=httpx.Response(400, text="time_start is after the last date")
+    )
+    df = asyncio.run(gridmet.fetch("pr", BBOX, start="2026-11-24", end="2026-11-25", today="2026-11-25"))
+    assert df.empty

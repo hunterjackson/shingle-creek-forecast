@@ -72,9 +72,18 @@ def year_chunks(start: str, end: str) -> list[tuple[str, str]]:
     return chunks
 
 
-async def fetch(var: str, bbox: BBox, start: str, end: str, client: httpx.AsyncClient | None = None, workers: int = 4) -> pd.DataFrame:
-    """One request per calendar year, `workers` at a time."""
+UNPUBLISHED_DAYS = 7  # gridMET lags 1-2 days; a 400 for a window starting this recently means "not published yet"
+
+
+async def fetch(var: str, bbox: BBox, start: str, end: str, client: httpx.AsyncClient | None = None, workers: int = 4,
+                today: str | None = None) -> pd.DataFrame:
+    """One request per calendar year, `workers` at a time.
+
+    THREDDS answers 400 when time_start is past the dataset's last day. For a window starting within
+    UNPUBLISHED_DAYS of `today` that just means nothing is published yet, so the result is empty; older 400s raise.
+    """
     dataset, varname = VARS[var]
+    recent = pd.Timestamp(today or pd.Timestamp.today().normalize()) - pd.Timedelta(days=UNPUBLISHED_DAYS)
 
     async def one(c: httpx.AsyncClient, cs: str, ce: str) -> pd.DataFrame:
         params = {
@@ -87,7 +96,12 @@ async def fetch(var: str, bbox: BBox, start: str, end: str, client: httpx.AsyncC
             "time_end": f"{ce}T00:00:00Z",
             "accept": "netcdf",
         }
-        resp = await http.get(c, f"{NCSS}/{dataset}", params=params)
+        try:
+            resp = await http.get(c, f"{NCSS}/{dataset}", params=params)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400 and pd.Timestamp(cs) >= recent:
+                return pd.DataFrame(index=pd.DatetimeIndex([], name="date"))
+            raise
         return parse_nc(resp.content, var)
 
     async with http.session(client, timeout=180) as c:
