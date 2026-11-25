@@ -2,7 +2,11 @@
 
 Written 2026-11-25, after the divergence work (`divergence_test_plan.md`). Phase 0 is done (results and the
 frozen scoring below). Phase 1 is done: rank skill matches, but the rain-total gate fails (reforecast ~20 % wetter
-at leads 1, 3, 4). Whether to continue is an open decision (Phase 1 results).
+at leads 1, 3, 4).
+
+**Closed 2026-11-25. Phases 2–5 will not be run.** The goal was better day-1 forecasts, and 1b shows the rain
+forecast is worth almost nothing at day 1 (it recovers 22 % of a 0.004 ft gap; MAE 0.058 c00 vs 0.054 perfect), as
+T6 found for perfect day-1 rain. The expected gains are at days 2–7, which the owner does not consider worth the cost.
 
 ## Why
 
