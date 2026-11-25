@@ -1,0 +1,50 @@
+Review screens, 5740 issue days 2007-10-01..2023-12-31 (perfect-rain OOF residuals)
+
+## A. correlation of candidate issue-time features with the OOF residual (Spearman)
+               h1     h3     h5     h7
+sofar      -0.135 -0.130 -0.207 -0.157
+slope3      0.108  0.128  0.195  0.155
+slope6      0.149  0.121  0.202  0.152
+slope12     0.176  0.098  0.189  0.147
+up_slope3   0.066  0.101  0.175  0.127
+up_slope6   0.075  0.097  0.187  0.141
+up_slope12  0.061  0.064  0.189  0.148
+
+Residual model on the candidates (LightGBM l1, 7 leaves, leave-3-year-block-out):
+ h               subset    n  mae prod  mae +features  change %
+h1                  all 5740    0.0355         0.0346   -2.3182
+h1 rising (dstage>=.05)  882    0.0817         0.0798   -2.3339
+h1        flood obs>=59   36    0.2041         0.2032   -0.4548
+h1            low water  224    0.0214         0.0219    1.9217
+h3                  all 5723    0.1381         0.1370   -0.8544
+h3 rising (dstage>=.05)  876    0.2970         0.2922   -1.5897
+h3        flood obs>=59   36    0.8245         0.8585    4.1330
+h3            low water  225    0.0614         0.0582   -5.2247
+h5                  all 5715    0.2016         0.1971   -2.2554
+h5 rising (dstage>=.05)  876    0.4102         0.3897   -5.0136
+h5        flood obs>=59   35    0.9781         1.0043    2.6794
+h5            low water  227    0.0807         0.0824    2.1833
+h7                  all 5714    0.2263         0.2227   -1.5835
+h7 rising (dstage>=.05)  874    0.4145         0.4024   -2.9367
+h7        flood obs>=59   34    1.2417         1.2553    1.0953
+h7            low water  227    0.1128         0.1134    0.4454
+
+## B. day-1 estimate as the target day is observed
+perfect-rain OOF 2007-10..2023-12 (MAE ft; 'moving days' = |day-1 change| >= 0.10 ft):
+cutoff UTC   EST  hours seen    n  frozen 13Z  naive    reg  reg vs frozen %  moving days: frozen  moving days: reg  n moving
+       12Z 08:00           8 5791      0.0355 0.0318 0.0251         -29.2438               0.0727            0.0476      1676
+       15Z 11:00          11 5791      0.0355 0.0251 0.0218         -38.6847               0.0727            0.0418      1676
+       18Z 14:00          14 5791      0.0355 0.0185 0.0170         -51.9634               0.0727            0.0319      1676
+       21Z 17:00          17 5791      0.0355 0.0116 0.0114         -67.9560               0.0727            0.0200      1676
+     00Z+1 20:00          20 5791      0.0355 0.0054 0.0052         -85.3199               0.0727            0.0079      1676
+     03Z+1 23:00          23 5791      0.0355 0.0034 0.0035         -90.2063               0.0727            0.0053      1676
+
+forecast mode (issued GEFS rain) 2020-10..2023-12:
+cutoff UTC   EST  hours seen    n  frozen 13Z  naive    reg  reg vs frozen %  moving days: frozen  moving days: reg  n moving
+       12Z 08:00           8 1183      0.0345 0.0297 0.0244         -29.2212               0.0678            0.0422       375
+       15Z 11:00          11 1183      0.0345 0.0232 0.0211         -38.8944               0.0678            0.0375       375
+       18Z 14:00          14 1183      0.0345 0.0175 0.0166         -51.7408               0.0678            0.0286       375
+       21Z 17:00          17 1183      0.0345 0.0109 0.0109         -68.3791               0.0678            0.0170       375
+     00Z+1 20:00          20 1183      0.0345 0.0054 0.0048         -86.1059               0.0678            0.0054       375
+     03Z+1 23:00          23 1183      0.0345 0.0028 0.0027         -92.2442               0.0678            0.0026       375
+

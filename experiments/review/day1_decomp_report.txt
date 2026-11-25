@@ -1,0 +1,31 @@
+Day-1 decomposition, 5791 issue days 2007-10..2023-12, perfect-rain OOF
+
+                                                      MAE all    bias  moving >=.10 (n=1676)  big >=.30 (n=577)  flood>=59  low water  p90 |err|
+estimate                                                                                                                                        
+production blend                                       0.0355  0.0006                 0.0727             0.1248     0.2041     0.0216     0.0782
+stage model alone                                      0.0347  0.0033                 0.0718             0.1229     0.2129     0.0208     0.0777
+rating hybrid alone                                    0.0468 -0.0022                 0.0980             0.1729     0.2986     0.0273     0.1042
+persist day-t mean                                     0.1145  0.0006                 0.3200             0.6009     0.6981     0.0395     0.3000
+persist morning reading                                0.0289 -0.0040                 0.0627             0.1066     0.0762     0.0171     0.0650
+naive (8 h seen + 16 h at morning reading)             0.0318 -0.0023                 0.0736             0.1265     0.1072     0.0167     0.0750
+reg: morning + (blend - morning)                       0.0267 -0.0001                 0.0569             0.0954     0.0807     0.0162     0.0572
+reg: + morning 8 h mean                                0.0251 -0.0001                 0.0478             0.0787     0.0594     0.0182     0.0508
+reg: no model at all (day-t mean, morning, 8 h mean)   0.0280 -0.0000                 0.0551             0.0916     0.0646     0.0185     0.0588
+
+mean coefficients (intercept first; target = day-1 mean - morning reading):
+  reg: morning + (blend - morning): [0.002 0.353]
+  reg: + morning 8 h mean: [ 0.005  0.367 -0.483]
+  reg: no model at all (day-t mean, morning, 8 h mean): [ 0.006 -0.01  -0.409]
+
+production error vs how far its forecast sits from the morning reading:
+       blend - morning  obs - morning
+count         5791.000       5791.000
+mean             0.005          0.004
+std              0.082          0.065
+min             -2.422         -0.245
+25%             -0.014         -0.015
+50%              0.002          0.000
+75%              0.019          0.010
+max              1.755          1.477
+corr(blend - morning, obs - morning) = 0.444; corr(error, blend - morning) = 0.675
+share of days where the morning reading is closer to the day-1 mean than production: 0.571
