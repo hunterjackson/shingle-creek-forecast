@@ -288,3 +288,25 @@ Open follow-ups:
 - **Day-1 overshoot on heavy-rain forecasts:** +0.08 ft mean, 9 of 13 days in 2020-23. That is too few events to tune on.
 - **"Never narrower" wet band:** see the retrained-model section above.
 - **Low-water cost of the flat rain scale:** see T4.
+
+### T6 upper-bound screen (run 2026-11-25) — `t6_screen.py`, `t6_report.txt`
+
+Lead-1 rain (all cells, and the GR4J flow it drives) = (1 − f)·issued GEFS + f·observed gridMET. f = 0.25 stands
+in for an 18Z rerun, 0.5 for 00Z, 1.0 for perfect day-1 rain. Mixing evenly in time is optimistic for the
+partial cases. MAE change vs the frozen forecast, wet days (GEFS basin rain over leads 1..h ≥ 5 mm):
+
+| f | day 1 (174) | day 2 (362) | day 3 (498) | day 4 (621) |
+|---|---|---|---|---|
+| 0.25 | −0.6 % | −5.0 % | −3.3 % | −1.9 % |
+| 0.5 | −1.8 % | −10.1 % (CI excl. 0) | −6.7 % (CI excl. 0) | −3.5 % |
+| 1.0 | +1.7 % | −14.8 % | −12.1 % | −5.6 % |
+
+- **Days 2–3 pass the screen, just.** An evening refresh would cut wet-day error by 7–10 % (all days: −7.6 % / −5.5 %).
+- **Day 1 gains nothing, even with perfect rain.** On the 13 days with ≥ 20 mm forecast, observed rain makes day 1
+  worse (bias +0.08 → +0.12 ft). The day-1 overshoot is therefore in how the day-1 model responds to heavy
+  rain, not in the rain forecast. It is Ian-dominated and only 13 days, so it is not acted on.
+- **The real test needs data that has not been pulled yet.** For each wet issue day of 2020–23 (~500):
+  - MRMS 6-h QPE ending 18Z (or 00Z): roughly 4 MB per CONUS file, about 2 GB.
+  - The GEFS 12Z run: range requests, about 1.2 GB.
+  The design also needs a choice: keep scoring the morning issue in the forecast log, and publish the
+  refresh as an update.
