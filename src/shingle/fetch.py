@@ -42,12 +42,21 @@ async def run_all(tasks: dict[str, Awaitable[Any]], label: str = "") -> dict[str
     return dict(zip(tasks, results))
 
 
-async def fetch_history(data_dir: Path, today: str | None = None, start: str = config.HISTORY_START, refresh: bool = False) -> None:
-    """Update the daily caches (USGS daily values, gridMET, DBHYDRO) and the basin outline, all at once."""
+async def fetch_history(
+    data_dir: Path, today: str | None = None, start: str = config.HISTORY_START, refresh: bool = False,
+    revise_every: pd.Timedelta | None = None,
+) -> None:
+    """Update the daily caches (USGS daily values, gridMET, DBHYDRO) and the basin outline, all at once.
+
+    `revise_every`: how often to re-fetch recent days for revisions (see cache.update_daily);
+    None re-fetches them on every call.
+    """
     data_dir = Path(data_dir)
 
     def daily(name: str, fn):
-        return cache.update_daily(data_dir / f"{name}.parquet", fn, default_start=start, today=today, refresh=refresh)
+        return cache.update_daily(
+            data_dir / f"{name}.parquet", fn, default_start=start, today=today, refresh=refresh, revise_every=revise_every
+        )
 
     tasks = {}
     for site in (config.SITE, config.UPSTREAM_SITE):
@@ -92,6 +101,17 @@ def fetch_nwm_retro(data_dir: Path, start: str = "1979-02-02", end: str = "2023-
     return df
 
 
+def _day_ranges(days: list[pd.Timestamp]) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    """Sorted days -> (first, last) of each run of consecutive days."""
+    ranges: list[tuple[pd.Timestamp, pd.Timestamp]] = []
+    for d in days:
+        if ranges and d - ranges[-1][1] == pd.Timedelta(days=1):
+            ranges[-1] = (ranges[-1][0], d)
+        else:
+            ranges.append((d, d))
+    return ranges
+
+
 def _mrms_dir(data_dir: Path, hour: int) -> Path:
     return Path(data_dir) / ("mrms" if hour == 5 else f"mrms{hour:02d}")
 
@@ -100,8 +120,10 @@ async def fetch_mrms_history(data_dir: Path, start: str | None = None, today: st
     """Download MRMS daily QPE into data/mrms/YYYY-MM.parquet, one file per month (resumable).
 
     A month file is considered final once its last day is >= 5 days before
-    `today`; otherwise it is re-fetched (latest days get revised / filled in).
-    Months download at the same time; each is written as soon as it is complete.
+    `today`, and is then left alone. In other months only days that are not
+    cached yet (or came back empty, e.g. not yet published) are downloaded:
+    MRMS files are not revised once published, so cached days are never asked
+    for again. Months download at the same time; each is written when complete.
     """
     from shingle.sources import mrms
 
@@ -115,12 +137,23 @@ async def fetch_mrms_history(data_dir: Path, start: str | None = None, today: st
         m_end = min(end_ts, month.end_time.normalize())
         path = out / f"{month}.parquet"
         final = month.end_time.normalize() <= end_ts - pd.Timedelta(days=5)
-        if path.exists() and final:
-            existing = pd.read_parquet(path)
-            if existing.index.max() >= month.end_time.normalize():
-                return
+        existing = pd.read_parquet(path) if path.exists() else None
+        if existing is not None and final and existing.index.max() >= month.end_time.normalize():
+            return
+        have = set(existing.index[existing.notna().any(axis=1)]) if existing is not None else set()
+        missing = [d for d in pd.date_range(m_start, m_end) if d not in have]
+        if not missing:
+            return
         kw = {"hour": hour} if hour != 5 else {}
-        df = await mrms.fetch(m_start.strftime("%Y-%m-%d"), m_end.strftime("%Y-%m-%d"), config.BBOX, workers=workers, **kw)
+        parts = [
+            await mrms.fetch(a.strftime("%Y-%m-%d"), b.strftime("%Y-%m-%d"), config.BBOX, workers=workers, **kw)
+            for a, b in _day_ranges(missing)
+        ]
+        df = pd.concat(parts)
+        if existing is not None:
+            df = df.combine_first(existing)
+        df = df[~df.index.duplicated(keep="last")].sort_index()
+        df.index.name = "date"
         df.to_parquet(path)
 
     # a long backfill has hundreds of months; a few at a time keeps the request count bounded
@@ -140,11 +173,14 @@ IV_START = "2007-01-01"  # NWIS instantaneous-value archive starts ~2007 for our
 
 async def fetch_iv_history(
     data_dir: Path, sites=None, start: str = IV_START, today: str | None = None, overlap_days: int = 3,
+    revise_every: pd.Timedelta | None = None, now: pd.Timestamp | None = None,
 ) -> None:
     """Hourly-mean instantaneous discharge/stage per site -> data/usgs_iv_{site}.parquet.
 
     First run pulls year by year from `start`; later runs re-fetch from the last
-    stored day minus `overlap_days` (provisional values get revised). Each year
+    stored day minus `overlap_days` (provisional values get revised). With
+    `revise_every` set, that revision pass runs at most that often; in between,
+    only readings from the last stored hour on are asked for. Each year
     is written to disk as soon as it arrives (requests retry temporary failures
     themselves), so an interrupted pull resumes where it stopped. Sites download
     at the same time.
@@ -156,7 +192,13 @@ async def fetch_iv_history(
         path = Path(data_dir) / f"usgs_iv_{site}.parquet"
         path.parent.mkdir(parents=True, exist_ok=True)
         stored = pd.read_parquet(path) if path.exists() else None
-        s = (stored.index.max().tz_localize(None).normalize() - pd.Timedelta(days=overlap_days)) if stored is not None else pd.Timestamp(start)
+        revising = stored is None or cache.revision_due(path, revise_every, now)
+        if stored is None:
+            s = pd.Timestamp(start)
+        elif revising:
+            s = stored.index.max().tz_localize(None).normalize() - pd.Timedelta(days=overlap_days)
+        else:
+            s = stored.index.max().tz_localize(None).floor("h")  # its hourly mean may have been partial
         while s < end_ts:
             e = min(pd.Timestamp(f"{s.year}-12-31 23:59"), end_ts)
             part = await usgs.fetch_iv(site, s.strftime("%Y-%m-%dT%H:%MZ"), e.strftime("%Y-%m-%dT%H:%MZ"))
@@ -164,6 +206,8 @@ async def fetch_iv_history(
             stored = stored[~stored.index.duplicated(keep="last")]
             stored.to_parquet(path)
             s = pd.Timestamp(f"{s.year + 1}-01-01")
+        if revising and revise_every is not None:
+            cache.mark_revised(path, now)
 
     await run_all({site: one(site) for site in sites})
 
@@ -175,14 +219,13 @@ def load_iv(data_dir: Path, site: str) -> pd.DataFrame | None:
 
 async def fetch_gefs_history(
     data_dir: Path, start: str = "2020-10-01", end: str | None = None, kinds=("mean", "spread"),
-    workers: int = 8, today: str | None = None, refresh_days: int = 2,
+    workers: int = 8, today: str | None = None,
 ) -> None:
     """00Z GEFSv12 APCP buckets per run -> data/gefs/{kind}/YYYY-MM.parquet (index run, fhour).
 
-    Runs already in a month file are skipped, except those from the last
-    `refresh_days` before `today` (fetched while still uploading, they may be
-    partial). New runs are merged into the month file, never replace it.
-    Runs missing from the archive are simply absent (and asked for again).
+    Runs already cached with every forecast hour are skipped; runs that are
+    missing or partial (fetched while still uploading) are asked for again.
+    New runs are merged into the month file, never replace it.
     `workers` runs download at a time, each fetching its forecast hours in parallel.
     """
     import httpx
@@ -192,7 +235,6 @@ async def fetch_gefs_history(
     today_ts = pd.Timestamp(today) if today else pd.Timestamp.today().normalize()
     end_ts = pd.Timestamp(end) if end else today_ts
     start_ts = pd.Timestamp(start)
-    fresh_from = today_ts - pd.Timedelta(days=refresh_days)
 
     async def one(client: httpx.AsyncClient, run: pd.Timestamp, kind: str) -> pd.DataFrame | None:
         df = await gefs.fetch_run(run, bbox=config.BBOX, kind=kind, client=client)
@@ -205,9 +247,12 @@ async def fetch_gefs_history(
             for month in pd.period_range(start_ts, end_ts, freq="M"):
                 path = out / f"{month}.parquet"
                 have = pd.read_parquet(path) if path.exists() else None
-                cached = set(have.index.get_level_values("run")) if have is not None else set()
+                complete = set()
+                if have is not None:
+                    per_run = have.groupby(level="run").size()
+                    complete = set(per_run.index[per_run >= len(gefs.FHOURS)])
                 runs = pd.date_range(max(start_ts, month.start_time), min(end_ts, month.end_time.normalize()))
-                runs = [r for r in runs if r not in cached or r >= fresh_from]
+                runs = [r for r in runs if r not in complete]
                 if not runs:
                     continue
                 parts = [p for p in await http.gather((one(client, r, kind) for r in runs), limit=workers) if p is not None]

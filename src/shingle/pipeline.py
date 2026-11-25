@@ -12,6 +12,9 @@ from shingle import basin, config, fcst, fetch, forecast_log, grid, live, output
 from shingle.sources import gefs, gridmet
 
 GEFS_BACKFILL_DAYS = 40
+# Re-fetch recent days for provisional-data revisions about once a day, not on every 3-hourly run;
+# under a day so the pass does not drift later each day with the run schedule.
+REVISE_EVERY = pd.Timedelta(hours=20)
 ISSUE_READY_UTC = pd.Timedelta(hours=13)  # 12Z readings + MRMS 12Z QPE (~1 h latency) are in by ~13Z
 MODEL_PATH = config.MODELS_DIR / "shingle.pkl"
 OUT_PATH = config.OUT_DIR / "shingle.json"
@@ -87,8 +90,8 @@ def update_inputs(data_dir: Path, today: pd.Timestamp | None = None) -> None:
 
     asyncio.run(fetch.run_all(
         {
-            "daily history": fetch.fetch_history(data_dir),
-            "USGS hourly": fetch.fetch_iv_history(data_dir),
+            "daily history": fetch.fetch_history(data_dir, revise_every=REVISE_EVERY),
+            "USGS hourly": fetch.fetch_iv_history(data_dir, revise_every=REVISE_EVERY),
             "MRMS radar": fetch.fetch_mrms_history(data_dir, start=days_ago(14), hour=12),
             # cached runs are skipped, so a wide window is cheap and fills any gaps
             "GEFS": fetch.fetch_gefs_history(data_dir, start=days_ago(GEFS_BACKFILL_DAYS), kinds=("mean",)),

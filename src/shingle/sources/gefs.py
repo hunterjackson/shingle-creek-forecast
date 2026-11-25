@@ -20,6 +20,7 @@ import pandas as pd
 from shingle.sources import http
 from shingle.sources.gridmet import BBox
 
+FHOURS = tuple(range(18, 186, 6))  # 6-hour buckets covering local days 1-7
 BASE = "https://noaa-gefs-pds.s3.amazonaws.com"
 V12_START = pd.Timestamp("2020-09-24")  # GEFSv12 (atmos/pgrb2ap5 layout, ensemble mean files)
 KINDS = {"mean": "geavg", "spread": "gespr"}
@@ -79,7 +80,7 @@ def decode_crop(raw: bytes, bbox: BBox, margin: float = RES) -> pd.Series:
 
 
 async def fetch_run(
-    run: pd.Timestamp, fhours=tuple(range(18, 186, 6)), bbox: BBox | None = None, kind: str = "mean",
+    run: pd.Timestamp, fhours=FHOURS, bbox: BBox | None = None, kind: str = "mean",
     client: httpx.AsyncClient | None = None, workers: int = 8,
 ) -> pd.DataFrame | None:
     """6-hour APCP buckets (mm) for one run: index fhour, columns grid cells. None if the run is missing.

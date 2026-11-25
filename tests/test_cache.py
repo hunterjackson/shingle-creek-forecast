@@ -98,3 +98,31 @@ def test_empty_incremental_fetch_keeps_cache(tmp_path):
     df = asyncio.run(cache.update_daily(path, empty, default_start="2020-01-01", today="2020-01-11"))
 
     assert len(df) == 10
+
+
+def test_revision_pass_runs_at_most_every_interval_and_only_new_days_in_between(tmp_path):
+    path = tmp_path / "s.parquet"
+    every = pd.Timedelta(hours=20)
+    t0 = pd.Timestamp("2020-01-10T13:00Z")
+    fetch = FakeFetch(1)
+
+    asyncio.run(cache.update_daily(path, fetch, "2020-01-01", today="2020-01-08", revise_every=every, now=t0))
+    # 3 h later: no revision due, so only days after the last cached one
+    asyncio.run(cache.update_daily(path, fetch, "2020-01-01", today="2020-01-10", revise_every=every, now=t0 + pd.Timedelta(hours=3)))
+    # yesterday (01-09) is cached now: nothing new can be published yet, so no request at all
+    asyncio.run(cache.update_daily(path, fetch, "2020-01-01", today="2020-01-10", revise_every=every, now=t0 + pd.Timedelta(hours=6)))
+    # 21 h after the last pass: the 10-day revision window again
+    df = asyncio.run(cache.update_daily(path, fetch, "2020-01-01", today="2020-01-11", revise_every=every, now=t0 + pd.Timedelta(hours=21)))
+
+    assert fetch.calls == [("2020-01-01", "2020-01-08"), ("2020-01-09", "2020-01-10"), ("2019-12-31", "2020-01-11")]
+    assert df.index.is_unique and df.index.max() == pd.Timestamp("2020-01-11")
+
+
+def test_without_revise_every_every_call_refetches_the_overlap(tmp_path):
+    path = tmp_path / "s.parquet"
+    fetch = FakeFetch(1)
+    asyncio.run(cache.update_daily(path, fetch, "2020-01-01", today="2020-01-10"))
+    asyncio.run(cache.update_daily(path, fetch, "2020-01-01", today="2020-01-10", overlap_days=2))
+
+    assert fetch.calls[-1] == ("2020-01-08", "2020-01-10")
+    assert not (tmp_path / "s.parquet.meta.json").exists()
