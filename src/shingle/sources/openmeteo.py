@@ -11,6 +11,8 @@ import httpx
 import numpy as np
 import pandas as pd
 
+from shingle.sources import http
+
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 HISTORICAL_FORECAST_URL = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 TIMEZONE = "America/New_York"
@@ -46,8 +48,7 @@ def _base_params(cells: pd.DataFrame) -> dict:
 
 def _get(url: str, params: dict, client: httpx.Client | None) -> dict | list:
     client = client or httpx.Client(timeout=120)
-    resp = client.get(url, params=params)
-    resp.raise_for_status()
+    resp = http.get(client, url, params=params)
     return resp.json()
 
 

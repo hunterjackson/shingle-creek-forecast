@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from shingle.sources import http
 from shingle.sources.gridmet import BBox
 
 ARCHIVE = "https://mtarchive.geol.iastate.edu"
@@ -75,10 +76,9 @@ def crop(da: xr.DataArray, bbox: BBox) -> pd.Series:
 def fetch_day(day: pd.Timestamp, bbox: BBox, client: httpx.Client | None = None, hour: int = 5) -> pd.Series | None:
     client = client or httpx.Client(timeout=120)
     for url in candidate_urls(day, hour):
-        resp = client.get(url)
+        resp = http.get(client, url, allow=(404,))
         if resp.status_code == 404:
             continue
-        resp.raise_for_status()
         s = crop(decode_grib(gzip.decompress(resp.content)), bbox)
         s.name = pd.Timestamp(day).normalize()
         return s
@@ -89,17 +89,8 @@ def fetch(start: str, end: str, bbox: BBox, workers: int = 8, hour: int = 5) -> 
     days = pd.date_range(start, end, name="date")
     client = httpx.Client(timeout=120, limits=httpx.Limits(max_connections=workers))
 
-    def one(day):
-        for attempt in range(3):
-            try:
-                return fetch_day(day, bbox, client=client, hour=hour)
-            except (httpx.TransportError, httpx.HTTPStatusError):
-                if attempt == 2:
-                    raise
-        return None
-
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(pool.map(one, days))
+        results = list(pool.map(lambda day: fetch_day(day, bbox, client=client, hour=hour), days))
     rows = {d: s for d, s in zip(days, results) if s is not None}
     df = pd.DataFrame.from_dict(rows, orient="index") if rows else pd.DataFrame()
     df = df.reindex(days)

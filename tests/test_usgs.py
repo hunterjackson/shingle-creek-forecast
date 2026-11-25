@@ -70,6 +70,19 @@ def test_fetch_dv_requests_expected_url_and_parses(dv_payload):
     assert len(df) == 7
 
 
+@respx.mock
+def test_fetch_dv_retries_a_reset_connection(dv_payload):
+    # the 2026-11-25 07:37Z forecast run failed on exactly this
+    route = respx.get("https://waterservices.usgs.gov/nwis/dv/").mock(
+        side_effect=[httpx.ConnectError("[Errno 104] Connection reset by peer"), httpx.Response(200, json=dv_payload)]
+    )
+
+    df = usgs.fetch_dv("02264495", start="2024-10-08", end="2024-10-14")
+
+    assert route.call_count == 2
+    assert len(df) == 7
+
+
 @pytest.fixture
 def iv_payload():
     return json.loads((FIXTURES / "usgs_iv.json").read_text())

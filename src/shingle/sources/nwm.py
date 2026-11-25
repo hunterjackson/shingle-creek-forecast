@@ -11,6 +11,8 @@ import re
 import httpx
 import pandas as pd
 
+from shingle.sources import http
+
 NWPS = "https://api.water.noaa.gov/nwps/v1/reaches"
 LOCAL_TZ = "America/New_York"
 COLUMNS = ["series", "member", "reference_time", "valid_time", "flow_cfs"]
@@ -49,6 +51,5 @@ def daily_mean(df: pd.DataFrame) -> pd.Series:
 
 def fetch_streamflow(reach: str, series: str, client: httpx.Client | None = None) -> pd.DataFrame:
     client = client or httpx.Client(timeout=60)
-    resp = client.get(f"{NWPS}/{reach}/streamflow", params={"series": series})
-    resp.raise_for_status()
+    resp = http.get(client, f"{NWPS}/{reach}/streamflow", params={"series": series})
     return parse_streamflow(resp.json())

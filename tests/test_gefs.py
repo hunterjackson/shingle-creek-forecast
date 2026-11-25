@@ -95,7 +95,7 @@ def test_fetch_run_retries_transient_errors():
     respx.get(url__regex=r".*\.idx$").mock(side_effect=[httpx.ConnectTimeout("handshake"), httpx.Response(200, text=text)])
     respx.get(url__regex=r".*0p50\.f0\d\d$").mock(side_effect=[httpx.ReadTimeout("slow"), httpx.Response(206, content=raw)])
 
-    df = gefs.fetch_run(RUN, fhours=(24,), bbox=BBOX, retry_wait=0)
+    df = gefs.fetch_run(RUN, fhours=(24,), bbox=BBOX)
 
     assert list(df.index) == [24]
 

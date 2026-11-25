@@ -13,6 +13,8 @@ import httpx
 import pandas as pd
 import xarray as xr
 
+from shingle.sources import http
+
 NCSS = "http://thredds.northwestknowledge.net:8080/thredds/ncss"
 
 # short name -> (dataset file, variable name)
@@ -85,8 +87,7 @@ def fetch(var: str, bbox: BBox, start: str, end: str, client: httpx.Client | Non
             "time_end": f"{ce}T00:00:00Z",
             "accept": "netcdf",
         }
-        resp = client.get(f"{NCSS}/{dataset}", params=params)
-        resp.raise_for_status()
+        resp = http.get(client, f"{NCSS}/{dataset}", params=params)
         frames.append(parse_nc(resp.content, var))
     df = pd.concat(frames)
     return df[~df.index.duplicated(keep="last")].sort_index()

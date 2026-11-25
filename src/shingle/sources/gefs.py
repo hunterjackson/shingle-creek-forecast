@@ -17,6 +17,7 @@ import httpx
 import numpy as np
 import pandas as pd
 
+from shingle.sources import http
 from shingle.sources.gridmet import BBox
 
 BASE = "https://noaa-gefs-pds.s3.amazonaws.com"
@@ -77,37 +78,23 @@ def decode_crop(raw: bytes, bbox: BBox, margin: float = RES) -> pd.Series:
     return s.where(s >= 0)
 
 
-def _get(client: httpx.Client, u: str, retries: int, retry_wait: float, **kw) -> httpx.Response:
-    import time
-
-    for attempt in range(retries + 1):
-        try:
-            return client.get(u, **kw)
-        except httpx.TransportError:
-            if attempt == retries:
-                raise
-            time.sleep(retry_wait * (attempt + 1))
-
-
 def fetch_run(
     run: pd.Timestamp, fhours=tuple(range(18, 186, 6)), bbox: BBox | None = None, kind: str = "mean",
-    client: httpx.Client | None = None, retries: int = 4, retry_wait: float = 5.0,
+    client: httpx.Client | None = None,
 ) -> pd.DataFrame | None:
     """6-hour APCP buckets (mm) for one run: index fhour, columns grid cells. None if the run is missing.
-    Transport errors (timeouts, resets) are retried."""
+    Temporary failures are retried (see shingle.sources.http)."""
     client = client or httpx.Client(timeout=60)
     rows = {}
     for fh in fhours:
         u = url(run, fh, kind)
-        r = _get(client, u + ".idx", retries, retry_wait)
+        r = http.get(client, u + ".idx", allow=(404,))
         if r.status_code == 404:
             if not rows:
                 return None
             continue
-        r.raise_for_status()
         start, end, _ = apcp_range(r.text)
-        d = _get(client, u, retries, retry_wait, headers={"Range": f"bytes={start}-{end - 1}"})
-        d.raise_for_status()
+        d = http.get(client, u, headers={"Range": f"bytes={start}-{end - 1}"})
         rows[fh] = decode_crop(d.content, bbox)
     if not rows:
         return None

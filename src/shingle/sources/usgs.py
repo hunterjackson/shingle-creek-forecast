@@ -6,6 +6,8 @@ import httpx
 import numpy as np
 import pandas as pd
 
+from shingle.sources import http
+
 DV_URL = "https://waterservices.usgs.gov/nwis/dv/"
 
 PARAMS = {"00060": "discharge_cfs", "00065": "stage_ft"}
@@ -41,8 +43,7 @@ def fetch_dv(site: str, start: str, end: str | None = None, client: httpx.Client
     if end:
         params["endDT"] = end
     client = client or httpx.Client(timeout=120)
-    resp = client.get(DV_URL, params=params)
-    resp.raise_for_status()
+    resp = http.get(client, DV_URL, params=params)
     return parse_dv(resp.json())
 
 
@@ -79,6 +80,5 @@ def fetch_iv(site: str, start: str, end: str | None = None, client: httpx.Client
     if end:
         params["endDT"] = end
     client = client or httpx.Client(timeout=300)
-    resp = client.get(IV_URL, params=params)
-    resp.raise_for_status()
+    resp = http.get(client, IV_URL, params=params)
     return parse_iv(resp.json())

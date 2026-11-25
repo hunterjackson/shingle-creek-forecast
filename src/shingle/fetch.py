@@ -121,19 +121,14 @@ IV_START = "2007-01-01"  # NWIS instantaneous-value archive starts ~2007 for our
 
 def fetch_iv_history(
     data_dir: Path, sites=None, start: str = IV_START, today: str | None = None, overlap_days: int = 3,
-    retries: int = 4, retry_wait: float = 10.0,
 ) -> None:
     """Hourly-mean instantaneous discharge/stage per site -> data/usgs_iv_{site}.parquet.
 
     First run pulls year by year from `start`; later runs re-fetch from the last
     stored day minus `overlap_days` (provisional values get revised). Each year
-    is retried on connection errors and written to disk as soon as it arrives,
-    so an interrupted pull resumes where it stopped.
+    is written to disk as soon as it arrives (requests retry temporary failures
+    themselves), so an interrupted pull resumes where it stopped.
     """
-    import time
-
-    import httpx
-
     sites = sites or (config.SITE, config.UPSTREAM_SITE)
     end_ts = pd.Timestamp(today) if today else pd.Timestamp.now(tz="UTC").tz_localize(None).normalize() + pd.Timedelta(days=1)
     for site in sites:
@@ -143,14 +138,7 @@ def fetch_iv_history(
         s = (stored.index.max().tz_localize(None).normalize() - pd.Timedelta(days=overlap_days)) if stored is not None else pd.Timestamp(start)
         while s < end_ts:
             e = min(pd.Timestamp(f"{s.year}-12-31 23:59"), end_ts)
-            for attempt in range(retries + 1):
-                try:
-                    part = usgs.fetch_iv(site, s.strftime("%Y-%m-%dT%H:%MZ"), e.strftime("%Y-%m-%dT%H:%MZ"))
-                    break
-                except (httpx.TransportError, httpx.HTTPStatusError):
-                    if attempt == retries:
-                        raise
-                    time.sleep(retry_wait * (attempt + 1))
+            part = usgs.fetch_iv(site, s.strftime("%Y-%m-%dT%H:%MZ"), e.strftime("%Y-%m-%dT%H:%MZ"))
             stored = (pd.concat([stored, part]) if stored is not None else part).sort_index()
             stored = stored[~stored.index.duplicated(keep="last")]
             stored.to_parquet(path)

@@ -7,6 +7,8 @@ from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
+from shingle.sources import http
+
 NLDI = "https://api.water.usgs.gov/nldi/linked-data/nwissite"
 
 
@@ -17,8 +19,7 @@ def parse_basin(geojson: dict) -> BaseGeometry:
 
 def fetch_basin_geojson(site: str, client: httpx.Client | None = None) -> dict:
     client = client or httpx.Client(timeout=60)
-    resp = client.get(f"{NLDI}/USGS-{site}/basin", params={"simplified": "true"})
-    resp.raise_for_status()
+    resp = http.get(client, f"{NLDI}/USGS-{site}/basin", params={"simplified": "true"})
     return resp.json()
 
 

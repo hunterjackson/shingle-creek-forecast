@@ -116,7 +116,7 @@ def test_fetch_retries_transient_connection_errors(payload):
         side_effect=[httpx.ConnectError("reset"), httpx.Response(200, json=payload)]
     )
 
-    df = dbhydro.fetch(["68918"], start="2024-10-01", end="2024-10-05", retry_wait=0)
+    df = dbhydro.fetch(["68918"], start="2024-10-01", end="2024-10-05")
 
     assert route.call_count == 2
     assert not df.empty

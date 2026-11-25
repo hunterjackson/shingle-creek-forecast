@@ -12,11 +12,11 @@ telemetry series that continues to the present.
 
 from __future__ import annotations
 
-import time
-
 import httpx
 import numpy as np
 import pandas as pd
+
+from shingle.sources import http
 
 URL = "https://insightsdata.api.sfwmd.gov/v1/insights-data/cont/data"
 
@@ -72,19 +72,6 @@ def _date_chunks(start: str, end: str, years: int) -> list[tuple[pd.Timestamp, p
     return chunks
 
 
-def _get(client: httpx.Client, params: dict, retries: int, retry_wait: float) -> dict:
-    for attempt in range(retries + 1):
-        try:
-            resp = client.get(URL, params=params)
-            resp.raise_for_status()
-            return resp.json()
-        except (httpx.TransportError, httpx.HTTPStatusError):
-            if attempt == retries:
-                raise
-            time.sleep(retry_wait * (attempt + 1))
-    raise AssertionError("unreachable")
-
-
 def fetch(
     dbkeys: list[str],
     start: str,
@@ -92,8 +79,6 @@ def fetch(
     client: httpx.Client | None = None,
     max_keys: int = 3,
     chunk_years: int = 10,
-    retries: int = 3,
-    retry_wait: float = 5.0,
 ) -> pd.DataFrame:
     """Fetch in (key-group x decade) chunks - one big request gets its connection reset."""
     client = client or httpx.Client(timeout=180)
@@ -109,7 +94,7 @@ def fetch(
                 "endDate": ce.strftime("%Y%m%d"),
                 "datum": "NGVD29",
             }
-            df = parse(_get(client, params, retries, retry_wait))
+            df = parse(http.get(client, URL, params=params).json())
             result = df if result is None else df.combine_first(result)
     result = result if result is not None else parse({})
     cols = [k for k in dbkeys if k in result.columns] + [c for c in result.columns if c not in dbkeys]
