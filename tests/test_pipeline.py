@@ -84,3 +84,22 @@ def test_cli_score_prints_table(monkeypatch, tmp_path, capsys):
     cli.main(["score", "--data-dir", str(tmp_path)])
 
     assert "mae" in capsys.readouterr().out
+
+
+def test_forecast_rain_shows_unscaled_gefs_basin_rain():
+    """The site's rain column is the issued GEFS basin rain, not the per-lead bias scale (~1.4x) that only the
+    day 4-7 models use: it must match what other forecasts show and what days 1-3 were driven by."""
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    day = pd.Timestamp("2026-11-24")
+    src = pd.DataFrame({"lat": [28.0, 28.0, 28.5, 28.5], "lon": [-81.5, -81.0, -81.5, -81.0]},
+                       index=["28.0000_-81.5000", "28.0000_-81.0000", "28.5000_-81.5000", "28.5000_-81.0000"])
+    cols = pd.MultiIndex.from_tuples([(k, c) for k in (1, 2) for c in src.index], names=["lead", "cell"])
+    raw = pd.DataFrame([[10.0] * 4 + [2.0] * 4], index=pd.DatetimeIndex([day], name="date"), columns=cols)
+    cells = pd.DataFrame({"lat": [28.25], "lon": [-81.25]}, index=["28.2500_-81.2500"])
+    art = SimpleNamespace(gr4j=SimpleNamespace(weights={"28.2500_-81.2500": 1.0}), scale={1: 1.4, 2: 1.4})
+    rain = pipeline.forecast_rain(art, cells, raw, src, day)
+    assert np.allclose(rain.to_numpy(), [10.0, 2.0])
+    assert list(rain.index) == [day + pd.Timedelta(days=1), day + pd.Timedelta(days=2)]

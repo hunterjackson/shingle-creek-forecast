@@ -155,3 +155,32 @@ Findings:
   single day, which is what T3 tests.
 - Only 13 heavy-forecast days in 3 years. Event-by-event table in `t1_report.txt`. Ian (2022-09-26/27)
   dominates the large misses.
+
+### T4 (run 2026-11-25) — `t4_consistency.py`, `t4_report.txt`; T4b — `t4b_qmap.py`, `t4b_report.txt`
+
+MAE at days 4 / 7 (all days; flood obs ≥ 59 ft, 14 days of one event; low water, 85 days):
+
+| Rain setting | all d4 | all d7 | flood d4 | flood d7 | low d4 | low d7 | roughness 3→4 |
+|---|---|---|---|---|---|---|---|
+| mixed (production) | 0.213 | 0.328 | 1.02 | 1.75 | 0.110 | 0.153 | 0.076 |
+| raw everywhere | 0.218 | 0.340 | 1.21 | 2.15 | 0.085 | 0.103 | 0.072 |
+| scaled everywhere | 0.213 | 0.328 | 1.02 | 1.75 | 0.110 | 0.153 | 0.074 |
+| per-lead (consistent) | 0.218 | 0.336 | 1.21 | 2.00 | 0.088 | 0.125 | 0.071 |
+| quantile-mapped, h4–7 | 0.241 | 0.385 | 0.98 | 1.02 | 0.128 | 0.179 | — |
+
+(Scaled everywhere is also 4 % worse than mixed at day 2.)
+
+- **Production's mixed setting stays.** Every alternative is worse overall at days 4–7. Per-lead and raw
+  lose 2–4 % (CIs include 0), with much larger flood misses; quantile mapping loses 13–17 % (CI excludes 0).
+- **The jagged 11-24 path is not systematic.** On dry transitions, the 3→4 step averages 0.076 ft under
+  mixed against 0.071 under per-lead. That difference is too small to be worth the accuracy loss.
+- **Open question (not pursued here):** the flat scale costs 25–50 % on low-water days at days 4–7
+  (0.153 vs 0.103 at day 7). A state-dependent choice could recover it, but it would be tuned on
+  85 low-water days and one flood. That belongs in a future model-test stage, not in this fix.
+- Quantile mapping inflates the ensemble-mean tail absurdly (35 mm → 250 mm at lead 4). Its flood gain
+  is Ian alone, so the bootstrap CI is degenerate. Rejected.
+
+### T5 (done 2026-11-25)
+
+`pipeline.forecast_rain` now reports the issued GEFS basin rain without the per-lead scale. The model
+inputs are unchanged. The 11-24 issue would have shown 38 mm for 11-25 instead of 52.5 mm.

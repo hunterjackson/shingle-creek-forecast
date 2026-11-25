@@ -33,7 +33,8 @@ def gefs_raw(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def forecast_rain(art: train.Artifact, cells: pd.DataFrame, raw: pd.DataFrame, src: pd.DataFrame, issue_day) -> pd.Series:
-    """Bias-scaled basin-areal GEFS rain (mm) for each forecast date."""
+    """Issued GEFS basin-areal rain (mm) for each forecast date, as published (no per-lead bias scale: that only
+    feeds the day 4-7 models and would show the site's readers ~1.4x what the forecast says)."""
     day = pd.Timestamp(issue_day)
     w = grid.bilinear_weights(cells[["lat", "lon"]], src)
     out = {}
@@ -42,7 +43,7 @@ def forecast_rain(art: train.Artifact, cells: pd.DataFrame, raw: pd.DataFrame, s
             out[day + pd.Timedelta(days=int(k))] = np.nan
             continue
         mapped = grid.apply_weights(raw[k].loc[[day]], w)
-        out[day + pd.Timedelta(days=int(k))] = float(fcst._areal(mapped, art.gr4j.weights).iloc[0]) * art.scale.get(int(k), 1.0)
+        out[day + pd.Timedelta(days=int(k))] = float(fcst._areal(mapped, art.gr4j.weights).iloc[0])
     return pd.Series(out)
 
 
