@@ -5,3 +5,4 @@ catboost_info/
 fc_data.pkl
 fc_models/
 fc_*.parquet
+fc_members/
