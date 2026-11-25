@@ -125,3 +125,33 @@ Only a candidate that passes the screen gets a full pull and wiring.
 
 T0 (free, tomorrow) → T1 (an hour, existing predictions) → T4 and T5 (known defects, independent of
 T1) → T2 → T3 → T6 → T7.
+
+## Results
+
+### T1 (run 2026-11-25) — `experiments/divergence/t1_wet.py`, `t1_report.txt`
+
+Forecast-mode OOF 2020-10..2023-12 (1,186 issue days, rebuilt `fc_prod.parquet`; MAE 0.034 / 0.155 / 0.251 /
+0.328 at days 1/3/5/7, as before). Bands: leave-one-year-out |p50 − stage| conformal, the production day-1 band.
+
+| GEFS lead-1 basin rain | n | bias d1 | bias d2 | bias d3 | cov d1 | cov d2 | cov d3 | width d1 |
+|---|---|---|---|---|---|---|---|---|
+| all | 1186 | −0.00 | −0.03 | −0.07 | 78 % | 78 % | 77 % | 0.09 |
+| < 5 mm | 1012 | −0.00 | −0.01 | −0.03 | 81 % | 84 % | 82 % | 0.09 |
+| 5–20 mm | 161 | −0.02 | −0.15 | −0.24 | 64 % | 48 % | 47 % | 0.12 |
+| ≥ 20 mm | 13 | +0.08 | −0.30 | −0.62 | 23 % | 8 % | 38 % | 0.13 |
+| ≥ 30 mm | 5 | +0.18 | −0.64 | −0.70 | 20 % | 20 % | 60 % | 0.14 |
+
+Findings:
+
+- **The range is far too narrow whenever rain is forecast.** This is the clearest result and it does not
+  rest on a handful of events: the 161 days with 5–20 mm forecast have 64 % / 48 % / 47 % coverage at
+  days 1–3. All of the shortfall sits on these days; dry days are at or above 80 %. T2 goes ahead.
+- **On heavy-rain days the day-1 forecast rises too early.** Bias at day 1 is positive on 9 of the 13 days
+  with ≥ 20 mm forecast (+0.42 and +0.46 ft on two). Then days 2–3 come in too low. The 11-24 issue
+  looks the same: +0.36 ft forecast for the day the rain was due.
+- **GEFS is not wet-biased here.** Observed basin rain is 1.5× the GEFS mean overall, and 1.37× on
+  ≥ 20 mm days. Only 4 of the 13 heavy-forecast days got less than half. So the 11-25 forecast (35 mm,
+  with ECMWF/NBM at ~15) may simply be one of those misses. The mean is still a poor guess on any
+  single day, which is what T3 tests.
+- Only 13 heavy-forecast days in 3 years. Event-by-event table in `t1_report.txt`. Ian (2022-09-26/27)
+  dominates the large misses.
