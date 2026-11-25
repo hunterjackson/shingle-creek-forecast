@@ -355,3 +355,39 @@ This withdraws the "day-1 model over-responds to heavy rain" reading of T1 and T
 **Conclusion for the 11-24 issue:** the +0.36 ft day-1 rise is the normal response to ~35 mm on wet ground.
 The day-1 miss is entirely the GEFS rain forecast (~35 mm issued vs ~4 mm by 15Z; NBM/ECMWF ~15 mm).
 Next lever: rain-forecast accuracy and resolution (NBM screen).
+
+## Rain-forecast accuracy and resolution (2026-11-25) — `experiments/rainfc/`
+
+**Step 1: rain alone** (`fetch.py`, `screen.py`, `screen_report.txt`). Lead-1 basin rain vs gridMET on 385 sampled
+2020–23 days (NBM on 219 of them):
+
+| Source | Spearman (basin) | false alarms @10 mm | obs/fc |
+|---|---|---|---|
+| GEFS 0.5° mean (production) | 0.63 | 36 % | 1.8 |
+| GEFS 0.25° mean | 0.63 | 38 % | 1.8 |
+| NBM 2.5 km | 0.70 (diff +0.07, CI +0.01..+0.13) | 13 % | 2.8 |
+
+GEFS at 0.25° adds nothing over 0.5°. NBM ranks rainy days better and false-alarms far less, but it compresses
+large totals.
+
+**Step 2: stage forecast with NBM lead 1** (`model_screen.py`). Same 219 days, forecast-mode OOF models, NBM
+rescaled leave-one-year-out:
+
+| | Day 1 | Day 2 | Day 3 | Day 4 |
+|---|---|---|---|---|
+| All days | +1.9 % | +3.8 % | +7.0 % (CI excl. 0) | +5.9 % |
+| GEFS busts (GEFS ≥ 20 mm, obs < 10 mm) | −19 % | −32 % | −8 % | −31 % |
+| Heavy days (either ≥ 20 mm) | +1 % | +4 % | +12 % | +15 % |
+
+The NBM/GEFS average comes out near neutral overall (+0.4 to +3 %), with the same trade-off. **NBM is not adopted:**
+it fixes GEFS false alarms like 11-25 but under-forecasts real floods, which matter more. The full NBM history
+pull (~5 GB for lead 1, ~36 GB for all leads) is not justified.
+
+**Step 3: disagreement as a range signal** (`disagree.py`). |log GEFS − log NBM| barely relates to misses once
+the wet-day range is in place. Day-1 coverage by disagreement tercile is 78 / 76 / 71 %; Spearman with |residual|
+is +0.06 at day 1 and −0.09 at day 3. **Dropped.**
+
+**Where this leaves rain accuracy:**
+- GEFS stays the input; the rain-aware range carries its uncertainty.
+- An untested candidate is ECMWF. Its open-data archive only starts around 2023, too short for an honest backtest
+  now, so it would need to be logged forward and evaluated later.
