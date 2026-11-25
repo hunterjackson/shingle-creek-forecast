@@ -1,0 +1,12 @@
+T7 screen: Spearman r of GR4J log-flow error at t with residual (obs - p50)
+
+GR4J log error at t, 2020-23: median +0.010, IQR -0.281..+0.362
+forecast-mode h1: all r=+0.013   wet>=5 r=+0.107 (n=174)
+forecast-mode h2: all r=+0.038   wet>=5 r=+0.099 (n=364)
+forecast-mode h3: all r=+0.045   wet>=5 r=+0.089 (n=501)
+forecast-mode h5: all r=+0.038   wet>=5 r=+0.061 (n=737)
+forecast-mode h7: all r=+0.029   wet>=5 r=+0.031 (n=916)
+perfect-rain OOF 1979-2023 h1: r=-0.012
+perfect-rain OOF 1979-2023 h3: r=-0.025
+perfect-rain OOF 1979-2023 h5: r=-0.040
+perfect-rain OOF 1979-2023 h7: r=-0.041

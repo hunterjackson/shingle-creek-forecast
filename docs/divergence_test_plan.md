@@ -234,3 +234,57 @@ at day 3. Dry and flood days were unchanged, and pinball improved 2 %. Adopted:
   The wet bins are calibrated on forecast-mode OOF days with ≥ 5 mm. If fewer than 30 such days exist,
   the band is left unwrapped.
 - how-it-works.html updated. **Needs a retrain (train workflow) to go live.**
+
+### Retrained model on the 11-24 case (local, train_end 2026-11-15)
+
+Day 1 goes from 57.08–57.28 to 57.02–57.35, and day 3 from 56.91–58.38 to 57.15–58.38. **Day 2 narrows**, from
+57.06–58.29 to 57.41–58.22: on wet days the wet bins replace the learned band. That was the tested design,
+so it is not changed after the one-shot test.
+- Follow-up: try "never narrower than the base band" on 2020-23 OOF. It needs fresh evidence because the test
+  period has been used.
+- The p50 stays 0.4 ft above the no-rain outcome. If the rain fails, the day-1 mean (~56.8) still falls below
+  the range. A calibrated range cannot absorb a miss that large on a single day.
+
+### T3 (run 2026-11-25) — `t3_screen.py`, `t3_report.txt`
+
+Screened on days with ≥ 5 mm of GEFS rain forecast (174 / 362 / 498 at days 1–3), 10 cached members, 2020-23.
+
+| MAE, wet days | d1 | d2 | d3 |
+|---|---|---|---|
+| GEFS mean (production) | 0.077 | 0.192 | 0.263 |
+| median of member-driven forecasts | 0.076 | 0.191 | 0.268 |
+| member-median rain | 0.075 | 0.191 | 0.276 |
+
+Member-median rain is 2.7 % better at day 1 (0.002 ft; CI excludes 0) but 4.6 % worse at day 3 (CI excludes 0).
+The member-forecast median is within noise. Spread-based bands were already rejected in the members experiment
+(flood coverage 43 % → 14 % at day 1). **No hedge beats the mean; no change.**
+- A second-source disagreement test (GFS/NBM vs GEFS) was not run. There is no free ECMWF archive back to
+  2020, and the member spread already measures forecast disagreement without helping.
+
+### T7 (run 2026-11-25) — `t7_gr4j.py`, `t7_report.txt`
+
+Spearman r between GR4J's log-flow error at issue time and the forecast residual:
+- Forecast mode: |r| ≤ 0.11 at every horizon.
+- Perfect-rain OOF 1979–2023: |r| ≤ 0.04.
+
+The sign is positive: GR4J running high goes with the creek ending *higher* than forecast, the opposite
+of an overshoot. The +40 % on 11-24 is inside GR4J's usual spread (interquartile range −25 % to +44 %).
+**Dropped.**
+
+## Status after day 1
+
+| Test | Outcome |
+|---|---|
+| T0 | Pending: score once the 11-25 MRMS/gauge daily values post (HRRR showed ~4 mm by 15Z) |
+| T1 | Done. Range far too narrow on rain-forecast days; day-1 overshoot on ≥ 20 mm days |
+| T2 | Done and implemented (WetBand, days 1–3). **Needs retrain + push to go live** |
+| T3 | Done. No change |
+| T4 | Done. No change (mixed rain kept) |
+| T5 | Done and implemented (site rain column unscaled) |
+| T6 | Open (intraday refresh) |
+| T7 | Done. Dropped |
+
+Open follow-ups:
+- **Day-1 overshoot on heavy-rain forecasts:** +0.08 ft mean, 9 of 13 days in 2020-23. That is too few events to tune on.
+- **"Never narrower" wet band:** see the retrained-model section above.
+- **Low-water cost of the flat rain scale:** see T4.
