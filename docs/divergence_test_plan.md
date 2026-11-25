@@ -281,7 +281,7 @@ of an overshoot. The +40 % on 11-24 is inside GR4J's usual spread (interquartile
 | T3 | Done. No change |
 | T4 | Done. No change (mixed rain kept) |
 | T5 | Done and implemented (site rain column unscaled) |
-| T6 | Open (intraday refresh) |
+| T6 | Done: screen passed, real test failed. No refresh built |
 | T7 | Done. Dropped |
 
 Open follow-ups:
@@ -310,3 +310,29 @@ partial cases. MAE change vs the frozen forecast, wet days (GEFS basin rain over
   - The GEFS 12Z run: range requests, about 1.2 GB.
   The design also needs a choice: keep scoring the morning issue in the forecast log, and publish the
   refresh as an update.
+
+### T6 real test (run 2026-11-25) — `t6_fetch.py`, `t6_test.py`, `t6_report.txt`
+
+**Data.** What a 19:30Z run on day t+1 would know:
+- MRMS hourly Pass2 rain for 12–18Z. IEM archives no 6-h product; 19 of 651 days had a missing hour.
+- The GEFS 12Z run.
+
+Days: every 2020-23 issue day with ≥ 5 mm forecast over days 1–3 (487 usable), plus 145 random dry days.
+The 00Z lead construction matches production `daily_leads` exactly (2,227 days). MAE change vs the frozen 13Z
+forecast:
+
+| Wet days | d1 | d2 | d3 | d4 | d7 |
+|---|---|---|---|---|---|
+| refresh (radar 12–18Z + 12Z GEFS) | −1.5 % | −2.8 % (CI excl. 0) | +0.7 % | +1.2 % | −0.3 % |
+| radar 12–18Z + rest of 00Z run | −1.9 % | −2.7 % (CI excl. 0) | −0.1 % | −0.7 % | −0.1 % |
+| 12Z GEFS only | +1.2 % | −0.6 % | +0.8 % | +2.5 % (CI excl. 0) | −2.0 % |
+
+On dry days the refresh is +3 % at day 1 (CI touches 0) and −5 % at day 7 (CI excl. 0).
+
+- **The refresh gains almost nothing.** At most 0.004 ft, at day 2.
+- **The screen's −10 % was the optimistic proxy.** It mixed in a share of the whole day's actual rain;
+  six real hours say little about the rest of a rain day.
+- **The 12Z GEFS run is no better than 00Z at days 1–4.**
+- **Not built.** The current reading already updates every 3 h.
+- Side note, not pursued: the 12Z run is 2–5 % better at day 7, and on dry days. A future model-test stage could
+  check whether using the latest complete GEFS run at 13Z (the 06Z run is out by then) helps long horizons.
