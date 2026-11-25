@@ -17,6 +17,8 @@ function el(tag, attrs = {}, parent = null, text = null) {
 }
 
 const day = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d, 12); }; // local noon of a calendar day
+// The gauge's day (USGS daily mean) runs midnight to midnight Eastern Standard Time, i.e. 05Z to 05Z.
+const gaugeDay = (s) => { const [y, m, d] = s.split("-").map(Number); const a = new Date(Date.UTC(y, m - 1, d, 5)); return [a, new Date(a.getTime() + 864e5)]; };
 const ft = (x, nd = 2) => (x === null || x === undefined || Number.isNaN(x) ? "—" : x.toFixed(nd));
 const fmtDay = (d, opts = { weekday: "short", month: "short", day: "numeric" }) => d.toLocaleDateString("en-US", opts);
 const weekday = (d) => d.toLocaleDateString("en-US", { weekday: "long" });
@@ -209,15 +211,14 @@ function renderHydro(fc, obs) {
   const hourlyStart = hourly.length ? hourly[0].t : now;
   const obsLine = daily.filter((r) => day(r.date) < hourlyStart).map((r) => ({ t: day(r.date), v: r.stage })).concat(hourly);
 
-  const issue = fc.issue_day ? obs.daily.find((r) => r.date === fc.issue_day) : null;
-  const fcLine = (issue && issue.stage !== null ? [{ t: day(issue.date), v: issue.stage, lo: issue.stage, hi: issue.stage }] : [])
-    .concat(rows.map((r) => ({ t: day(r.date), v: r.p50, lo: r.p10 ?? r.p50, hi: r.p90 ?? r.p50 })));
+  // Each forecast is that day's expected average, so it is drawn as a step spanning the gauge's day, not a point.
+  const fcSteps = rows.map((r) => { const [a, b] = gaugeDay(r.date); return { a, b, v: r.p50, lo: r.p10 ?? r.p50, hi: r.p90 ?? r.p50 }; });
 
-  const vals = obsLine.map((p) => p.v).concat(fcLine.flatMap((p) => [p.lo, p.hi]));
+  const vals = obsLine.map((p) => p.v).concat(fcSteps.flatMap((p) => [p.lo, p.hi]));
   let ymin = Math.min(...vals), ymax = Math.max(...vals, st.action);
   const pad = Math.max(0.15, (ymax - ymin) * 0.06);
   ymin -= pad; ymax += pad;
-  const t0 = start.getTime(), t1 = (fcLine.length ? fcLine[fcLine.length - 1].t : now).getTime() + 12 * 3600e3;
+  const t0 = start.getTime(), t1 = (fcSteps.length ? fcSteps[fcSteps.length - 1].b : now).getTime() + 3 * 3600e3;
   const x = (t) => m.l + (t.getTime() - t0) / (t1 - t0) * (W - m.l - m.r);
   const y = (v) => m.t + (ymax - v) / (ymax - ymin) * (H - m.t - m.b);
 
@@ -249,19 +250,16 @@ function renderHydro(fc, obs) {
   el("text", { x: x(now) + 5, y: H - m.b - 6 }, svg, "now");
 
   const path = (pts, f) => pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(f(p)).toFixed(1)}`).join("");
-  if (fcLine.length > 1) {
-    const band = path(fcLine, (p) => p.hi) + fcLine.slice().reverse().map((p) => `L${x(p.t).toFixed(1)},${y(p.lo).toFixed(1)}`).join("") + "Z";
-    el("path", { d: band, fill: css("--fc-wash") }, svg);
-    el("path", { d: path(fcLine, (p) => p.v), fill: "none", stroke: css("--fc"), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+  const gap = 1.5; // px between neighbouring days, so each step reads as one day
+  for (const s of fcSteps) {
+    const xa = x(s.a) + gap, xb = x(s.b) - gap;
+    el("rect", { x: xa, y: y(s.hi), width: Math.max(1, xb - xa), height: Math.max(1, y(s.lo) - y(s.hi)), fill: css("--fc-wash") }, svg);
+    el("line", { x1: xa, x2: xb, y1: y(s.v), y2: y(s.v), stroke: css("--fc"), "stroke-width": 2.5, "stroke-linecap": "round" }, svg);
   }
   if (obsLine.length > 1) {
     el("path", { d: path(obsLine, (p) => p.v), fill: "none", stroke: css("--obs"), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
     const last = obsLine[obsLine.length - 1];
     el("circle", { cx: x(last.t), cy: y(last.v), r: 4, fill: css("--obs"), stroke: css("--surface"), "stroke-width": 2 }, svg);
-  }
-  if (fcLine.length) {
-    const end = fcLine[fcLine.length - 1];
-    el("circle", { cx: x(end.t), cy: y(end.v), r: 4, fill: css("--fc"), stroke: css("--surface"), "stroke-width": 2 }, svg);
   }
 
   // hover / keyboard layer: snap to the nearest calendar day
@@ -274,12 +272,13 @@ function renderHydro(fc, obs) {
   let idx = keys.length - 1;
   const show = (i, clientX, clientY) => {
     idx = Math.max(0, Math.min(keys.length - 1, i));
-    const k = keys[idx], d = days.get(k), cx = x(day(k));
+    const k = keys[idx], d = days.get(k);
+    const cx = x(d.p50 !== undefined ? new Date(gaugeDay(k)[0].getTime() + 12 * 3600e3) : day(k));
     cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
     tip.replaceChildren();
     el("div", { class: "tt-date" }, tip, fmtDay(day(k), { weekday: "short", month: "short", day: "numeric", year: "numeric" }));
     if (d.obs !== undefined) row(tip, "--obs", ft(d.obs), "observed daily mean");
-    if (d.p50 !== undefined) { row(tip, "--fc", ft(d.p50), "forecast"); row(tip, null, `${ft(d.p10)}–${ft(d.p90)}`, "likely range"); }
+    if (d.p50 !== undefined) { row(tip, "--fc", ft(d.p50), "expected daily average"); row(tip, null, `${ft(d.p10)}–${ft(d.p90)}`, "likely range"); }
     tip.hidden = false;
     const r = svg.getBoundingClientRect();
     const px = clientX ?? r.left + cx * (r.width / W), py = clientY ?? r.top + r.height * 0.3;
