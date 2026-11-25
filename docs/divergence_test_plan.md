@@ -285,7 +285,7 @@ of an overshoot. The +40 % on 11-24 is inside GR4J's usual spread (interquartile
 | T7 | Done. Dropped |
 
 Open follow-ups:
-- **Day-1 overshoot on heavy-rain forecasts:** +0.08 ft mean, 9 of 13 days in 2020-23. That is too few events to tune on.
+- ~~Day-1 overshoot on heavy-rain forecasts~~ — withdrawn, see "Day-1 check" below.
 - **"Never narrower" wet band:** see the retrained-model section above.
 - **Low-water cost of the flat rain scale:** see T4.
 
@@ -336,3 +336,22 @@ On dry days the refresh is +3 % at day 1 (CI touches 0) and −5 % at day 7 (CI 
 - **Not built.** The current reading already updates every 3 h.
 - Side note, not pursued: the 12Z run is 2–5 % better at day 7, and on dry days. A future model-test stage could
   check whether using the latest complete GEFS run at 13Z (the 06Z run is out by then) helps long horizons.
+
+### Day-1 check (run 2026-11-25) — `day1_check.py`
+
+This withdraws the "day-1 model over-responds to heavy rain" reading of T1 and T6, which rested on 13 days
+(Ian-dominated).
+
+1. **No timing leak.** Basin gridMET rain matches MRMS 12Z..12Z labelled D at lag 0 (Spearman 0.88; lag ±1 ≤ 0.08),
+   so the day convention is right.
+2. **The day-1 response to rain that really falls is unbiased.** Perfect-rain OOF 1979–2023, day 1:
+
+| Rain on t+1 | Rain t−2..t | n | bias | forecast rise | observed rise |
+|---|---|---|---|---|---|
+| < 5 mm | < 5 mm | 7311 | +0.001 | −0.04 | −0.04 |
+| ≥ 25 mm | < 5 mm | 101 | −0.029 | +0.10 | +0.13 |
+| ≥ 25 mm | ≥ 5 mm | 270 | −0.023 | +0.35 | +0.37 |
+
+**Conclusion for the 11-24 issue:** the +0.36 ft day-1 rise is the normal response to ~35 mm on wet ground.
+The day-1 miss is entirely the GEFS rain forecast (~35 mm issued vs ~4 mm by 15Z; NBM/ECMWF ~15 mm).
+Next lever: rain-forecast accuracy and resolution (NBM screen).
