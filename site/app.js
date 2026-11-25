@@ -266,6 +266,16 @@ function renderHydro(fc, obs) {
   const days = new Map();
   for (const r of obs.daily || []) if (r.stage !== null && day(r.date) >= start) days.set(r.date, { obs: r.stage });
   for (const r of rows) days.set(r.date, Object.assign(days.get(r.date) || {}, { p50: r.p50, p10: r.p10, p90: r.p90 }));
+  // the day in progress has no daily mean yet: show the latest reading and the average of today's readings so far
+  for (const [k, d] of days) {
+    const [a, b] = gaugeDay(k);
+    if (d.obs !== undefined || now < a || now >= b) continue;
+    const today = hourly.filter((h) => h.t >= a && h.t < b);
+    if (today.length) {
+      d.latest = today[today.length - 1];
+      d.soFar = today.reduce((s, h) => s + h.v, 0) / today.length;
+    }
+  }
   const keys = [...days.keys()].sort();
   const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-2"), "stroke-width": 1, visibility: "hidden" }, svg);
   const tip = document.getElementById("tooltip");
@@ -278,6 +288,11 @@ function renderHydro(fc, obs) {
     tip.replaceChildren();
     el("div", { class: "tt-date" }, tip, fmtDay(day(k), { weekday: "short", month: "short", day: "numeric", year: "numeric" }));
     if (d.obs !== undefined) row(tip, "--obs", ft(d.obs), "observed daily mean");
+    if (d.latest) {
+      const at = d.latest.t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short" });
+      row(tip, "--obs", ft(d.latest.v), `latest reading, ${at}`);
+      row(tip, "--obs", ft(d.soFar), "average so far today");
+    }
     if (d.p50 !== undefined) { row(tip, "--fc", ft(d.p50), "expected daily average"); row(tip, null, `${ft(d.p10)}–${ft(d.p90)}`, "likely range"); }
     tip.hidden = false;
     const r = svg.getBoundingClientRect();
