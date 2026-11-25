@@ -32,7 +32,7 @@ def parse_dv(payload: dict) -> pd.DataFrame:
     return df.astype(float)
 
 
-def fetch_dv(site: str, start: str, end: str | None = None, client: httpx.Client | None = None) -> pd.DataFrame:
+async def fetch_dv(site: str, start: str, end: str | None = None, client: httpx.AsyncClient | None = None) -> pd.DataFrame:
     params = {
         "sites": site,
         "parameterCd": ",".join(PARAMS),
@@ -42,8 +42,8 @@ def fetch_dv(site: str, start: str, end: str | None = None, client: httpx.Client
     }
     if end:
         params["endDT"] = end
-    client = client or httpx.Client(timeout=120)
-    resp = http.get(client, DV_URL, params=params)
+    async with http.session(client, timeout=120) as c:
+        resp = await http.get(c, DV_URL, params=params)
     return parse_dv(resp.json())
 
 
@@ -74,11 +74,11 @@ def parse_iv(payload: dict) -> pd.DataFrame:
     return df.astype(float)
 
 
-def fetch_iv(site: str, start: str, end: str | None = None, client: httpx.Client | None = None) -> pd.DataFrame:
+async def fetch_iv(site: str, start: str, end: str | None = None, client: httpx.AsyncClient | None = None) -> pd.DataFrame:
     """start/end: ISO timestamps (e.g. '2024-10-09T00:00Z')."""
     params = {"sites": site, "parameterCd": ",".join(PARAMS), "startDT": start, "format": "json", "siteStatus": "all"}
     if end:
         params["endDT"] = end
-    client = client or httpx.Client(timeout=300)
-    resp = http.get(client, IV_URL, params=params)
+    async with http.session(client, timeout=300) as c:
+        resp = await http.get(c, IV_URL, params=params)
     return parse_iv(resp.json())

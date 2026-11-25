@@ -12,7 +12,6 @@ from __future__ import annotations
 import gzip
 import os
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import numpy as np
@@ -73,10 +72,10 @@ def crop(da: xr.DataArray, bbox: BBox) -> pd.Series:
     return pd.Series(vals.ravel(), index=pd.Index(ids, name="cell_id"))
 
 
-def fetch_day(day: pd.Timestamp, bbox: BBox, client: httpx.Client | None = None, hour: int = 5) -> pd.Series | None:
-    client = client or httpx.Client(timeout=120)
+async def fetch_day(day: pd.Timestamp, bbox: BBox, client: httpx.AsyncClient | None = None, hour: int = 5) -> pd.Series | None:
     for url in candidate_urls(day, hour):
-        resp = http.get(client, url, allow=(404,))
+        async with http.session(client, timeout=120) as c:
+            resp = await http.get(c, url, allow=(404,))
         if resp.status_code == 404:
             continue
         s = crop(decode_grib(gzip.decompress(resp.content)), bbox)
@@ -85,12 +84,11 @@ def fetch_day(day: pd.Timestamp, bbox: BBox, client: httpx.Client | None = None,
     return None
 
 
-def fetch(start: str, end: str, bbox: BBox, workers: int = 8, hour: int = 5) -> pd.DataFrame:
+async def fetch(start: str, end: str, bbox: BBox, workers: int = 8, hour: int = 5) -> pd.DataFrame:
+    """All days at once, `workers` at a time."""
     days = pd.date_range(start, end, name="date")
-    client = httpx.Client(timeout=120, limits=httpx.Limits(max_connections=workers))
-
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(pool.map(lambda day: fetch_day(day, bbox, client=client, hour=hour), days))
+    async with http.session(None, timeout=120) as c:
+        results = await http.gather((fetch_day(day, bbox, client=c, hour=hour) for day in days), limit=workers)
     rows = {d: s for d, s in zip(days, results) if s is not None}
     df = pd.DataFrame.from_dict(rows, orient="index") if rows else pd.DataFrame()
     df = df.reindex(days)

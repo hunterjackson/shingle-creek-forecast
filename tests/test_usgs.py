@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -59,7 +60,7 @@ def test_fetch_dv_requests_expected_url_and_parses(dv_payload):
         return_value=httpx.Response(200, json=dv_payload)
     )
 
-    df = usgs.fetch_dv("02264495", start="2024-10-08", end="2024-10-14")
+    df = asyncio.run(usgs.fetch_dv("02264495", start="2024-10-08", end="2024-10-14"))
 
     params = route.calls.last.request.url.params
     assert params["sites"] == "02264495"
@@ -77,7 +78,7 @@ def test_fetch_dv_retries_a_reset_connection(dv_payload):
         side_effect=[httpx.ConnectError("[Errno 104] Connection reset by peer"), httpx.Response(200, json=dv_payload)]
     )
 
-    df = usgs.fetch_dv("02264495", start="2024-10-08", end="2024-10-14")
+    df = asyncio.run(usgs.fetch_dv("02264495", start="2024-10-08", end="2024-10-14"))
 
     assert route.call_count == 2
     assert len(df) == 7
@@ -115,7 +116,7 @@ def test_parse_iv_drops_no_data_values(iv_payload):
 def test_fetch_iv_requests_utc_window(iv_payload):
     route = respx.get("https://nwis.waterservices.usgs.gov/nwis/iv/").mock(return_value=httpx.Response(200, json=iv_payload))
 
-    df = usgs.fetch_iv("02264495", start="2024-10-09T23:00Z", end="2024-10-10T03:00Z")
+    df = asyncio.run(usgs.fetch_iv("02264495", start="2024-10-09T23:00Z", end="2024-10-10T03:00Z"))
 
     params = route.calls.last.request.url.params
     assert params["sites"] == "02264495" and params["parameterCd"] == "00060,00065"

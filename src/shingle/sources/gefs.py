@@ -78,26 +78,28 @@ def decode_crop(raw: bytes, bbox: BBox, margin: float = RES) -> pd.Series:
     return s.where(s >= 0)
 
 
-def fetch_run(
+async def fetch_run(
     run: pd.Timestamp, fhours=tuple(range(18, 186, 6)), bbox: BBox | None = None, kind: str = "mean",
-    client: httpx.Client | None = None,
+    client: httpx.AsyncClient | None = None, workers: int = 8,
 ) -> pd.DataFrame | None:
     """6-hour APCP buckets (mm) for one run: index fhour, columns grid cells. None if the run is missing.
-    Temporary failures are retried (see shingle.sources.http)."""
-    client = client or httpx.Client(timeout=60)
-    rows = {}
-    for fh in fhours:
+    Forecast hours download `workers` at a time; temporary failures are retried (see shingle.sources.http)."""
+
+    async def one(c: httpx.AsyncClient, fh: int) -> pd.Series | None:
         u = url(run, fh, kind)
-        r = http.get(client, u + ".idx", allow=(404,))
+        r = await http.get(c, u + ".idx", allow=(404,))
         if r.status_code == 404:
-            if not rows:
-                return None
-            continue
+            return None
         start, end, _ = apcp_range(r.text)
-        d = http.get(client, u, headers={"Range": f"bytes={start}-{end - 1}"})
-        rows[fh] = decode_crop(d.content, bbox)
-    if not rows:
-        return None
+        d = await http.get(c, u, headers={"Range": f"bytes={start}-{end - 1}"})
+        return decode_crop(d.content, bbox)
+
+    async with http.session(client, timeout=60) as c:
+        first = await one(c, fhours[0])
+        if first is None:
+            return None  # run not (yet) in the archive: one request, not one per hour
+        rest = await http.gather((one(c, fh) for fh in fhours[1:]), limit=workers)
+    rows = {fh: s for fh, s in zip(fhours, [first, *rest]) if s is not None}
     df = pd.DataFrame(rows).T
     df.index.name = "fhour"
     return df

@@ -19,6 +19,9 @@ Retrain occasionally (e.g. monthly) so the rating, GR4J and rain-scale correctio
 
 One-off history pulls (resumable): `fetch.fetch_iv_history`, `fetch.fetch_gefs_history` (GEFSv12 2020-10+),
 `fetch.fetch_mrms_history(hour=12)`; see docs/shingle_findings.md for what each source is used for.
+These and every source client are async (httpx.AsyncClient on one asyncio event loop, no threads), so from a
+script call them as `asyncio.run(fetch.fetch_gefs_history(data_dir))`. `update_inputs` runs all sources at
+once and prints how long each took; failed requests are retried as described in `shingle/sources/http.py`.
 
 ## Live inputs
 | input | source | lag handling |

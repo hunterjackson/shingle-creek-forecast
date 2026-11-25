@@ -7,7 +7,11 @@ from shingle import cli, fetch
 
 def test_fetch_subcommand_calls_fetch_history(monkeypatch, tmp_path):
     seen = {}
-    monkeypatch.setattr(fetch, "fetch_history", lambda data_dir, refresh=False: seen.update(d=data_dir, r=refresh))
+
+    async def fake_fetch_history(data_dir, refresh=False):
+        seen.update(d=data_dir, r=refresh)
+
+    monkeypatch.setattr(fetch, "fetch_history", fake_fetch_history)
 
     cli.main(["fetch", "--data-dir", str(tmp_path), "--refresh"])
 

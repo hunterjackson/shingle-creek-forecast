@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -33,7 +34,7 @@ def test_fetch_basin_hits_nldi_for_usgs_site(basin_geojson):
         "https://api.water.usgs.gov/nldi/linked-data/nwissite/USGS-02264495/basin"
     ).mock(return_value=httpx.Response(200, json=basin_geojson))
 
-    poly = nldi.fetch_basin("02264495")
+    poly = asyncio.run(nldi.fetch_basin("02264495"))
 
     assert route.called
     assert poly.area > 0

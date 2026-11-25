@@ -17,11 +17,11 @@ def parse_basin(geojson: dict) -> BaseGeometry:
     return unary_union(geoms)
 
 
-def fetch_basin_geojson(site: str, client: httpx.Client | None = None) -> dict:
-    client = client or httpx.Client(timeout=60)
-    resp = http.get(client, f"{NLDI}/USGS-{site}/basin", params={"simplified": "true"})
+async def fetch_basin_geojson(site: str, client: httpx.AsyncClient | None = None) -> dict:
+    async with http.session(client, timeout=60) as c:
+        resp = await http.get(c, f"{NLDI}/USGS-{site}/basin", params={"simplified": "true"})
     return resp.json()
 
 
-def fetch_basin(site: str, client: httpx.Client | None = None) -> BaseGeometry:
-    return parse_basin(fetch_basin_geojson(site, client))
+async def fetch_basin(site: str, client: httpx.AsyncClient | None = None) -> BaseGeometry:
+    return parse_basin(await fetch_basin_geojson(site, client))

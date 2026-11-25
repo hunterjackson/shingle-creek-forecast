@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 import pandas as pd
 
-DailyFetch = Callable[[str, str], pd.DataFrame]
+DailyFetch = Callable[[str, str], Awaitable[pd.DataFrame]]  # async (start, end) -> frame
 
 
 def _fmt(ts: pd.Timestamp) -> str:
     return ts.strftime("%Y-%m-%d")
 
 
-def update_daily(
+async def update_daily(
     path: Path,
     fetch: DailyFetch,
     default_start: str,
@@ -37,7 +37,7 @@ def update_daily(
     else:
         start = old.index.max() - pd.Timedelta(days=overlap_days)
 
-    new = fetch(_fmt(start), _fmt(end))
+    new = await fetch(_fmt(start), _fmt(end))
     if old is None:
         df = new
     elif new.empty:
@@ -53,11 +53,11 @@ def update_daily(
     return df
 
 
-def cached_json(path: Path, compute: Callable[[], Any], refresh: bool = False) -> Any:
+async def cached_json(path: Path, compute: Callable[[], Awaitable[Any]], refresh: bool = False) -> Any:
     path = Path(path)
     if path.exists() and not refresh:
         return json.loads(path.read_text())
-    value = compute()
+    value = await compute()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2))
     return value

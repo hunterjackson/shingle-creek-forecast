@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -72,7 +73,7 @@ def test_fetch_streamflow_requests_series():
         return_value=httpx.Response(200, json=load("short_range"))
     )
 
-    df = nwm.fetch_streamflow("21476600", "short_range")
+    df = asyncio.run(nwm.fetch_streamflow("21476600", "short_range"))
 
     assert route.calls.last.request.url.params["series"] == "short_range"
     assert len(df) == 18
