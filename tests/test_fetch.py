@@ -125,8 +125,8 @@ def test_fetch_mrms_history_checkpoints_by_month_and_skips_complete_months(tmp_p
 
     calls.clear()
     asyncio.run(fetch.fetch_mrms_history(tmp_path, start="2024-01-15", today="2024-03-20"))
-    # Jan, Feb complete -> skipped; March (current, incomplete) refetched
-    assert calls == [("2024-03-01", "2024-03-20")]
+    # Jan, Feb complete -> skipped; in March only the days not cached yet are asked for
+    assert calls == [("2024-03-11", "2024-03-20")]
 
     df = fetch.load_mrms(tmp_path)
     assert df.index.min() == pd.Timestamp("2024-01-15")
@@ -194,7 +194,7 @@ def test_fetch_gefs_history_writes_monthly_files_and_skips_complete(tmp_path, mo
         calls.append((run, kind))
         if run == pd.Timestamp("2022-10-02"):
             return None  # missing run
-        return pd.DataFrame({"28.5000_-81.5000": [1.0, 2.0]}, index=pd.Index([18, 24], name="fhour"))
+        return pd.DataFrame({"28.5000_-81.5000": 1.0}, index=pd.Index(gefs.FHOURS, name="fhour"))
 
     monkeypatch.setattr(gefs, "fetch_run", fake_run)
 
@@ -205,9 +205,9 @@ def test_fetch_gefs_history_writes_monthly_files_and_skips_complete(tmp_path, mo
     assert sorted(b.index.get_level_values("run").unique()) == [pd.Timestamp(d) for d in ("2022-09-29", "2022-09-30", "2022-10-01", "2022-10-03")]
     assert (tmp_path / "gefs" / "mean" / "2022-09.parquet").exists()
 
-    calls.clear()  # September is complete and final -> not re-fetched; October re-fetched (not final)
+    calls.clear()  # complete runs are not re-fetched; only the run missing from the archive is asked for again
     asyncio.run(fetch.fetch_gefs_history(tmp_path, start="2022-09-29", end="2022-10-03", kinds=("mean",), workers=2, today="2022-10-04"))
-    assert all(c[0].month == 10 for c in calls)
+    assert [c[0] for c in calls] == [pd.Timestamp("2022-10-02")]
 
 
 def test_fetch_mrms_history_12z_goes_to_own_dir(tmp_path, monkeypatch):
@@ -237,7 +237,7 @@ def test_fetch_gefs_history_merges_new_runs_into_the_month_file(tmp_path, monkey
 
     async def fake_run(run, fhours=None, bbox=None, kind="mean", client=None):
         calls.append(run)
-        return pd.DataFrame({"28.5000_-81.5000": [float(run.day)]}, index=pd.Index([24], name="fhour"))
+        return pd.DataFrame({"28.5000_-81.5000": float(run.day)}, index=pd.Index(gefs.FHOURS, name="fhour"))
 
     monkeypatch.setattr(gefs, "fetch_run", fake_run)
 
@@ -247,7 +247,7 @@ def test_fetch_gefs_history_merges_new_runs_into_the_month_file(tmp_path, monkey
 
     runs = fetch.load_gefs(tmp_path).index.get_level_values("run").unique()
     assert list(runs) == list(pd.date_range("2026-11-01", "2026-11-25"))
-    # cached runs are skipped; the last two days are fetched again (may have been partial)
+    # complete cached runs are skipped
     assert calls == list(pd.date_range("2026-11-21", "2026-11-25"))
 
 
@@ -273,3 +273,66 @@ def test_run_all_overlaps_tasks_and_finishes_the_rest_when_one_fails(capsys):
         asyncio.run(fetch.run_all({"bad": broken(), "a": slow("a")}, label="update"))
     assert done == ["a"]  # the healthy source still finished (and saved its cache)
     assert "update: a " in capsys.readouterr().err
+
+
+def test_fetch_mrms_history_asks_again_for_days_that_came_back_empty(tmp_path, monkeypatch):
+    from shingle.sources import mrms
+
+    calls = []
+
+    async def fake_fetch(start, end, bbox, workers=8):
+        calls.append((start, end))
+        idx = pd.date_range(start, end, name="date")
+        df = pd.DataFrame({"28.500_-81.500": 1.0}, index=idx)
+        if not calls[1:]:
+            df.loc["2024-03-05"] = float("nan")  # not published yet on the first try
+        return df
+
+    monkeypatch.setattr(mrms, "fetch", fake_fetch)
+
+    asyncio.run(fetch.fetch_mrms_history(tmp_path, start="2024-03-01", today="2024-03-08"))
+    asyncio.run(fetch.fetch_mrms_history(tmp_path, start="2024-03-01", today="2024-03-09"))
+
+    assert calls == [("2024-03-01", "2024-03-08"), ("2024-03-05", "2024-03-05"), ("2024-03-09", "2024-03-09")]
+    df = fetch.load_mrms(tmp_path)
+    assert df.notna().all().all() and list(df.index) == list(pd.date_range("2024-03-01", "2024-03-09"))
+
+
+def test_fetch_gefs_history_refetches_partial_runs(tmp_path, monkeypatch):
+    from shingle.sources import gefs
+
+    calls = []
+
+    async def fake_run(run, fhours=None, bbox=None, kind="mean", client=None):
+        calls.append(run)
+        hours = gefs.FHOURS[:5] if len(calls) == 1 else gefs.FHOURS  # first try: still uploading
+        return pd.DataFrame({"28.5000_-81.5000": 1.0}, index=pd.Index(hours, name="fhour"))
+
+    monkeypatch.setattr(gefs, "fetch_run", fake_run)
+
+    for _ in range(3):
+        asyncio.run(fetch.fetch_gefs_history(tmp_path, start="2026-11-25", end="2026-11-25", kinds=("mean",), today="2026-11-25"))
+
+    assert len(calls) == 2  # partial, then complete; the third call sends nothing
+    assert len(fetch.load_gefs(tmp_path)) == len(gefs.FHOURS)
+
+
+def test_fetch_iv_history_between_revision_passes_asks_only_from_the_last_hour(tmp_path, monkeypatch):
+    calls = []
+
+    async def fake_iv(site, start, end=None, client=None):
+        calls.append(start)
+        idx = pd.date_range(pd.Timestamp(start).tz_localize(None), pd.Timestamp(end).tz_localize(None), freq="1h", tz="UTC", name="time")
+        return pd.DataFrame({"discharge_cfs": 100.0, "stage_ft": 55.0}, index=idx[:-1])
+
+    monkeypatch.setattr(usgs, "fetch_iv", fake_iv)
+    every, t0 = pd.Timedelta(hours=20), pd.Timestamp("2023-03-10T13:00Z")
+
+    def run(today, hours_later):
+        asyncio.run(fetch.fetch_iv_history(tmp_path, sites=("A",), start="2023-03-01", today=today, revise_every=every, now=t0 + pd.Timedelta(hours=hours_later)))
+
+    run("2023-03-10T13:00", 0)
+    run("2023-03-10T16:00", 3)
+    run("2023-03-11T10:00", 21)
+
+    assert calls == ["2023-03-01T00:00Z", "2023-03-10T12:00Z", "2023-03-07T00:00Z"]

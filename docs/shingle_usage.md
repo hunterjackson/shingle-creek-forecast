@@ -23,6 +23,19 @@ These and every source client are async (httpx.AsyncClient on one asyncio event 
 script call them as `asyncio.run(fetch.fetch_gefs_history(data_dir))`. `update_inputs` runs all sources at
 once and prints how long each took; failed requests are retried as described in `shingle/sources/http.py`.
 
+The forecast job runs every 3 h but the sources are free public services, so `update_inputs` only asks for
+what can have changed:
+
+| source | between revision passes | revision pass (at most every 20 h, `REVISE_EVERY`) |
+|---|---|---|
+| USGS daily, gridMET, DBHYDRO | days after the last cached one; nothing once yesterday is cached | last 10 days again |
+| USGS hourly | from the last cached hour | last 3 days again |
+| MRMS | only days not cached or empty (files are final once published) | — |
+| GEFS | only runs missing or without all 28 forecast hours | — |
+
+When each cache last did its revision pass is kept in `data/<file>.parquet.meta.json` (saved with the rest of
+`data/` by the Actions cache). Delete those files to force a revision pass on the next run.
+
 ## Live inputs
 | input | source | lag handling |
 |---|---|---|
