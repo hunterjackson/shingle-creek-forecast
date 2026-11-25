@@ -1,0 +1,29 @@
+T2 ONE-SHOT test 2024-01-01..2026-11-12: wet_add vs production bands
+
+Days per subset:
+   n all  n dry  n wet 5-20  n wet>=20  n flood
+h                                              
+1   1034    848         174         12        6
+3   1034    557         359        118        6
+
+cov:
+              cov all  cov dry  cov wet 5-20  cov wet>=20  cov flood
+h bands                                                             
+1 production    0.800    0.841         0.626        0.417      0.667
+  wet_add       0.838    0.841         0.845        0.500      0.667
+3 production    0.813    0.887         0.760        0.627      0.833
+  wet_add       0.844    0.887         0.830        0.686      0.833
+
+wid:
+              wid all  wid dry  wid wet 5-20  wid wet>=20  wid flood
+h bands                                                             
+1 production    0.094    0.088         0.120        0.135      0.212
+  wet_add       0.109    0.088         0.203        0.223      0.212
+3 production    0.427    0.255         0.555        0.850      1.401
+  wet_add       0.500    0.255         0.729        0.964      1.359
+
+pinball:
+bands  production  wet_add
+h                         
+1          0.0094   0.0092
+3          0.0380   0.0373

@@ -87,8 +87,11 @@ def test_oof_training_uses_learned_bands_from_day_two(trained_oof):
 
     hist, raw, src, art = trained_oof
 
-    assert isinstance(art.model.bands[1], BinnedConformal)
-    assert all(isinstance(art.model.bands[h], bands.LearnedBand) for h in H if h >= train.LEARNED_BANDS_FROM_H)
+    def base(b):
+        return b.base if isinstance(b, bands.WetBand) else b
+
+    assert isinstance(base(art.model.bands[1]), BinnedConformal)
+    assert all(isinstance(base(art.model.bands[h]), bands.LearnedBand) for h in H if h >= train.LEARNED_BANDS_FROM_H)
     day = pd.Timestamp(hist["gauge"].index[5 * 365 + 30])
     fc = train.predict(art, hist, raw, src, issue_day=day)
     assert (fc["p10"] <= fc["p50"]).all() and (fc["p50"] <= fc["p90"]).all()
@@ -106,3 +109,34 @@ def test_learned_bands_survive_save_and_backtest_matches_predict(trained_oof, tm
     one = train.predict(art, hist, raw, src, issue_day=days[2])
 
     np.testing.assert_allclose(bt.loc[days[2], [f"h{h}_p90" for h in H]].to_numpy(float), one["p90"].to_numpy(float))
+
+
+def test_oof_training_widens_days_1_to_3_when_rain_is_forecast(trained_oof):
+    """T2 (docs/divergence_test_plan.md): days 1-3 wrap the production band in a WetBand; later days are unchanged."""
+    from shingle import bands
+
+    hist, raw, src, art = trained_oof
+    for h in H:
+        b = art.model.bands[h]
+        if h <= train.WET_BANDS_MAX_H:
+            assert isinstance(b, bands.WetBand) and b.h == h and b.scale_model is not None
+            assert set(b.weights) == set(art.gr4j.weights)
+        else:
+            assert not isinstance(b, bands.WetBand)
+
+    # same issue day, issued rain forecast dry vs. soaked: only the wet one widens (day 1)
+    day = pd.Timestamp(hist["gauge"].index[5 * 365 + 30])
+    dry, wet = raw.copy(), raw.copy()
+    dry.loc[day] = 0.0
+    wet.loc[day] = 0.0
+    wet.loc[day, [c for c in wet.columns if c[0] == 1]] = 40.0
+    w_dry = train.predict(art, hist, dry, src, issue_day=day).set_index("date")
+    w_wet = train.predict(art, hist, wet, src, issue_day=day).set_index("date")
+    d1 = day + pd.Timedelta(days=1)
+    b1 = art.model.bands[1]
+
+    def width(df):
+        return round(float(df.loc[d1, "p90"] - df.loc[d1, "p10"]), 9)
+
+    assert width(w_wet) in set(np.round(b1.bins.hi - b1.bins.lo, 9))
+    assert width(w_dry) in set(np.round(b1.base.hi - b1.base.lo, 9))

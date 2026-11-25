@@ -212,3 +212,25 @@ wet_add keeps every dry day on the production band. Wet days get their own confo
   because production's learned band already includes forecast rain.
 - **Frozen candidate:** wet_add for days 1–3 (day 2 by interpolation; the width models exist for days 1/3/5/7
   in the harness), WET = 5 mm. Next: one look at 2024-01..2026-11-12, then implement if it holds.
+
+### T2 one-shot test and implementation (2026-11-25) — `t2_final.py`, `t2_final_report.txt`
+
+The script was committed before it was run. Test period 2024-01-01..2026-11-12; point model fit on data
+through 2023; bands calibrated on the 2020-23 forecast-mode OOF residuals.
+
+| Day | Band | cov all | cov dry | cov wet 5–20 | cov wet ≥ 20 | flood (of 6) | width all | pinball |
+|---|---|---|---|---|---|---|---|---|
+| 1 | production | 80 % | 84 % | 63 % (174) | 42 % (12) | 4 | 0.094 | 0.0094 |
+| 1 | wet_add | 84 % | 84 % | 85 % | 50 % | 4 | 0.109 | 0.0092 |
+| 3 | production | 81 % | 89 % | 76 % (359) | 63 % (118) | 5 | 0.427 | 0.0380 |
+| 3 | wet_add | 84 % | 89 % | 83 % | 69 % | 5 | 0.500 | 0.0373 |
+
+The candidate held. Wet-day coverage rose from 61 % to 82 % at day 1 (all ≥ 5 mm days) and from 73 % to 80 %
+at day 3. Dry and flood days were unchanged, and pinball improved 2 %. Adopted:
+
+- `shingle.bands.WetBand` and `forecast_rain_sum`. "Wet" uses the issued, unscaled GEFS basin rain over
+  t+1..t+h, or the observed future rain when no forecast is given.
+- `train.train` (oof_years) also fits a day-1 width model, then wraps the bands of days 1..`WET_BANDS_MAX_H` (3).
+  The wet bins are calibrated on forecast-mode OOF days with ≥ 5 mm. If fewer than 30 such days exist,
+  the band is left unwrapped.
+- how-it-works.html updated. **Needs a retrain (train workflow) to go live.**

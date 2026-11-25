@@ -79,3 +79,64 @@ class LearnedBand:
     def offsets_for(self, data: dict, index: pd.DatetimeIndex, p50: pd.Series) -> tuple[np.ndarray, np.ndarray]:
         X = scale_features(data, index, p50, self.h, self.cell)
         return self.split.offsets(X["adp50"].to_numpy(), self._scale(X))
+
+
+WET_MM = 5.0
+WET_QS = (1 / 3, 2 / 3)
+WET_MIN_COUNT = 30
+
+
+def forecast_rain_sum(data: dict, index: pd.DatetimeIndex, h: int, weights: dict[str, float]) -> pd.Series:
+    """Basin-areal rain (mm) over days t+1..t+h for each issue day: the issued forecast (data['fcst']['pr'], the
+    unscaled one, never by_h) when present, else the observed future rain."""
+    w = pd.Series(weights, dtype=float)
+    if "fcst" in data:
+        fpr = data["fcst"]["pr"]
+        total = sum(_areal(fpr[k], w) for k in range(1, h + 1))
+    else:
+        areal = _areal(data["pr"], w)
+        total = sum(areal.shift(-k) for k in range(1, h + 1))
+    return total.reindex(index)
+
+
+def _areal(df: pd.DataFrame, w: pd.Series) -> pd.Series:
+    w = w[w.index.isin(df.columns)]
+    return (df[w.index] * (w / w.sum())).sum(axis=1, min_count=len(w))
+
+
+class WetBand:
+    """T2 (docs/divergence_test_plan.md): on days with >= WET_MM of forecast basin rain over t+1..t+h, conformal bins
+    on a learned |residual| scale calibrated on such days only; every other day keeps the base (production) band.
+
+    Forecast-mode tests 2020-23 and 2024-26: day-1 coverage on 5-20 mm days 63-64 % -> 78-85 %, dry days unchanged."""
+
+    def __init__(self, bins: BinnedConformal, threshold: float = WET_MM):
+        self.bins, self.threshold = bins, threshold
+        self.base = self.scale_model = self.h = self.weights = None
+
+    @classmethod
+    def fit(cls, residuals, scale, coverage: float = 0.8, threshold: float = WET_MM) -> "WetBand":
+        return cls(BinnedConformal.fit_edges(residuals, scale, WET_QS, coverage, WET_MIN_COUNT), threshold)
+
+    def combine(self, base_lo, base_hi, wet, scale) -> tuple[np.ndarray, np.ndarray]:
+        wet = np.asarray(wet, bool)
+        lo, hi = self.bins.offsets(np.asarray(scale, float))
+        return np.where(wet, lo, base_lo), np.where(wet, hi, base_hi)
+
+    def attach(self, base, scale_model, h: int, weights: dict[str, float]) -> "WetBand":
+        self.base, self.scale_model, self.h, self.weights = base, scale_model, h, dict(weights)
+        return self
+
+    def scale(self, data: dict, index: pd.DatetimeIndex, p50: pd.Series) -> np.ndarray:
+        X = scale_features(data, index, p50, self.h)
+        return self.scale_model.predict(X[self.scale_model.feature_name_])
+
+    def wet(self, data: dict, index: pd.DatetimeIndex) -> np.ndarray:
+        return (forecast_rain_sum(data, index, self.h, self.weights).fillna(0.0) >= self.threshold).to_numpy()
+
+    def offsets_for(self, data: dict, index: pd.DatetimeIndex, p50: pd.Series) -> tuple[np.ndarray, np.ndarray]:
+        if hasattr(self.base, "offsets_for"):
+            blo, bhi = self.base.offsets_for(data, index, p50)
+        else:  # production day-1 band: bins on |p50 - stage(t)|
+            blo, bhi = self.base.offsets((p50 - data["stage"].loc[index]).abs().to_numpy())
+        return self.combine(blo, bhi, self.wet(data, index), self.scale(data, index, p50))

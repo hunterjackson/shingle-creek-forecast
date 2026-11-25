@@ -8,6 +8,9 @@ era inside training; conformal bands calibrated on *forecast-mode* predictions
 With oof_years, horizons >= LEARNED_BANDS_FROM_H get learned-width bands (shingle.bands): the width model is fit on
 out-of-fold perfect-rain residuals of the training years before fcst_start (blocks of scale_block_years), the bins
 on the forecast-mode OOF residuals. Day 1 keeps |p50 - stage| bins (learned bands lowered its flood coverage).
+
+Days 1..WET_BANDS_MAX_H then wrap that band in a bands.WetBand: on days with >= bands.WET_MM of issued basin rain
+over t+1..t+h, conformal bins on the learned scale calibrated on such forecast-mode days only (docs/divergence_test_plan.md T2).
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from shingle.models.base import HORIZONS, targets
 
 SCALED_FROM_H = 4
 LEARNED_BANDS_FROM_H = 2
+WET_BANDS_MAX_H = 3
 
 
 @dataclass
@@ -74,14 +78,34 @@ def perfect_oof(data: dict, tr: pd.DatetimeIndex, held_index: pd.DatetimeIndex, 
     return pd.concat(parts).sort_index()
 
 
-def _set_learned_bands(model, data, tr, pre, d_fc, fc_idx, preds_fc, horizons, block_years, gap_days) -> None:
+def _set_learned_bands(model, data, tr, pre, d_fc, fc_idx, preds_fc, horizons, block_years, gap_days, learned) -> dict:
+    """Fit |residual| scale models for `horizons`; horizons in `learned` get LearnedBand bands. Returns the scale models."""
     po = perfect_oof(data, tr, pre, horizons, block_years, gap_days)
     y_pre = targets(data["stage"], horizons).loc[po.index]
     y_fc = targets(d_fc["stage"], horizons).loc[fc_idx]
+    sms = {}
     for h in horizons:
-        sm = bands.LearnedBand.fit_scale(data, po.index, po[f"h{h}"], y_pre[f"h{h}"] - po[f"h{h}"], h)
+        sms[h] = bands.LearnedBand.fit_scale(data, po.index, po[f"h{h}"], y_pre[f"h{h}"] - po[f"h{h}"], h)
+        if h in learned:
+            p50 = preds_fc.loc[fc_idx, f"h{h}"]
+            model.bands[h] = bands.LearnedBand.fit(sms[h], d_fc, fc_idx, p50, y_fc[f"h{h}"] - p50, h, model.coverage)
+    return sms
+
+
+def _set_wet_bands(model, sms: dict, d_fc, fc_idx, preds_fc, weights: dict) -> None:
+    y_fc = targets(d_fc["stage"], model.horizons).loc[fc_idx]
+    for h, sm in sms.items():
+        if h > WET_BANDS_MAX_H:
+            continue
         p50 = preds_fc.loc[fc_idx, f"h{h}"]
-        model.bands[h] = bands.LearnedBand.fit(sm, d_fc, fc_idx, p50, y_fc[f"h{h}"] - p50, h, model.coverage)
+        r = y_fc[f"h{h}"] - p50
+        X = bands.scale_features(d_fc, fc_idx, p50, h)
+        scale = pd.Series(sm.predict(X[sm.feature_name_]), index=fc_idx)
+        wet = bands.forecast_rain_sum(d_fc, fc_idx, h, weights).fillna(0.0) >= bands.WET_MM
+        ok = wet & r.notna() & scale.notna()
+        if ok.sum() < bands.WET_MIN_COUNT:
+            continue
+        model.bands[h] = bands.WetBand.fit(r[ok], scale[ok], model.coverage).attach(model.bands[h], sm, h, weights)
 
 
 def train(
@@ -116,9 +140,11 @@ def train(
         preds_fc = pd.concat(parts)
         _set_bands(model, preds_fc, d_fc, fc_idx)
         learned = [h for h in horizons if h >= LEARNED_BANDS_FROM_H]
+        scaled = [h for h in horizons if h >= LEARNED_BANDS_FROM_H or h <= WET_BANDS_MAX_H]
         pre = tr[tr < pd.Timestamp(fcst_start)]
-        if learned and len(pre):
-            _set_learned_bands(model, data, tr, pre, d_fc, fc_idx, preds_fc, learned, scale_block_years, gap_days)
+        if scaled and len(pre):
+            sms = _set_learned_bands(model, data, tr, pre, d_fc, fc_idx, preds_fc, scaled, scale_block_years, gap_days, learned)
+            _set_wet_bands(model, sms, d_fc, fc_idx, preds_fc, weights)
     else:
         model.calibrate(d_fc, fc_idx)
 
