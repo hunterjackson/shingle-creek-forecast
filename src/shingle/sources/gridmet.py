@@ -72,11 +72,11 @@ def year_chunks(start: str, end: str) -> list[tuple[str, str]]:
     return chunks
 
 
-def fetch(var: str, bbox: BBox, start: str, end: str, client: httpx.Client | None = None) -> pd.DataFrame:
+async def fetch(var: str, bbox: BBox, start: str, end: str, client: httpx.AsyncClient | None = None, workers: int = 4) -> pd.DataFrame:
+    """One request per calendar year, `workers` at a time."""
     dataset, varname = VARS[var]
-    client = client or httpx.Client(timeout=180)
-    frames = []
-    for cs, ce in year_chunks(start, end):
+
+    async def one(c: httpx.AsyncClient, cs: str, ce: str) -> pd.DataFrame:
         params = {
             "var": varname,
             "north": bbox.north,
@@ -87,7 +87,10 @@ def fetch(var: str, bbox: BBox, start: str, end: str, client: httpx.Client | Non
             "time_end": f"{ce}T00:00:00Z",
             "accept": "netcdf",
         }
-        resp = http.get(client, f"{NCSS}/{dataset}", params=params)
-        frames.append(parse_nc(resp.content, var))
+        resp = await http.get(c, f"{NCSS}/{dataset}", params=params)
+        return parse_nc(resp.content, var)
+
+    async with http.session(client, timeout=180) as c:
+        frames = await http.gather((one(c, cs, ce) for cs, ce in year_chunks(start, end)), limit=workers)
     df = pd.concat(frames)
     return df[~df.index.duplicated(keep="last")].sort_index()

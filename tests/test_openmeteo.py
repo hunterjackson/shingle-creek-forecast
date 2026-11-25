@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -63,7 +64,7 @@ def test_fetch_forecast_sends_all_cells_in_one_request(payload, cells):
         return_value=httpx.Response(200, json=payload)
     )
 
-    out = openmeteo.fetch_forecast(cells)
+    out = asyncio.run(openmeteo.fetch_forecast(cells))
 
     params = route.calls.last.request.url.params
     assert params["latitude"] == "28.3,28.4"
@@ -80,7 +81,7 @@ def test_fetch_historical_forecast_uses_dates_and_other_host(payload, cells):
         return_value=httpx.Response(200, json=payload)
     )
 
-    openmeteo.fetch_historical_forecast(cells, start="2022-09-20", end="2022-10-05")
+    asyncio.run(openmeteo.fetch_historical_forecast(cells, start="2022-09-20", end="2022-10-05"))
 
     params = route.calls.last.request.url.params
     assert params["start_date"] == "2022-09-20"
@@ -118,7 +119,7 @@ def test_fetch_previous_runs_requests_lead_variables(prev_payload, cells):
         return_value=httpx.Response(200, json=prev_payload)
     )
 
-    openmeteo.fetch_previous_runs(cells, "2024-10-08", "2024-10-10", leads=(0, 1, 2))
+    asyncio.run(openmeteo.fetch_previous_runs(cells, "2024-10-08", "2024-10-10", leads=(0, 1, 2)))
 
     p = route.calls.last.request.url.params
     assert p["hourly"] == "precipitation,precipitation_previous_day1,precipitation_previous_day2"

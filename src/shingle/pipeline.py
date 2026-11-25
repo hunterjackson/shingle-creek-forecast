@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ import pandas as pd
 from shingle import basin, config, fcst, fetch, forecast_log, grid, live, output, train
 from shingle.sources import gefs, gridmet
 
+GEFS_BACKFILL_DAYS = 40
 ISSUE_READY_UTC = pd.Timedelta(hours=13)  # 12Z readings + MRMS 12Z QPE (~1 h latency) are in by ~13Z
 MODEL_PATH = config.MODELS_DIR / "shingle.pkl"
 OUT_PATH = config.OUT_DIR / "shingle.json"
@@ -77,11 +79,22 @@ def fit_radar_scale(gm: pd.DataFrame, radar: pd.DataFrame, cell: str = config.RA
 
 
 def update_inputs(data_dir: Path, today: pd.Timestamp | None = None) -> None:
+    """Refresh every input cache. The sources are independent, so they download at the same time (asyncio)."""
     today = (today or pd.Timestamp.now(tz="UTC").tz_localize(None)).normalize()
-    fetch.fetch_history(data_dir)
-    fetch.fetch_iv_history(data_dir)
-    fetch.fetch_mrms_history(data_dir, start=str((today - pd.Timedelta(days=14)).date()), hour=12)
-    fetch.fetch_gefs_history(data_dir, start=str((today - pd.Timedelta(days=5)).date()), kinds=("mean",))
+
+    def days_ago(n: int) -> str:
+        return str((today - pd.Timedelta(days=n)).date())
+
+    asyncio.run(fetch.run_all(
+        {
+            "daily history": fetch.fetch_history(data_dir),
+            "USGS hourly": fetch.fetch_iv_history(data_dir),
+            "MRMS radar": fetch.fetch_mrms_history(data_dir, start=days_ago(14), hour=12),
+            # cached runs are skipped, so a wide window is cheap and fills any gaps
+            "GEFS": fetch.fetch_gefs_history(data_dir, start=days_ago(GEFS_BACKFILL_DAYS), kinds=("mean",)),
+        },
+        label="update inputs",
+    ))
 
 
 def train_from_disk(data_dir: Path, model_path: Path, train_end: str) -> train.Artifact:
@@ -124,7 +137,7 @@ def nwm_stage_h1(rating, issue_day, toho: float, fetch=None) -> float | None:
 
     day1 = pd.Timestamp(issue_day).normalize() + pd.Timedelta(days=1)
     try:
-        df = fetch() if fetch else nwm.fetch_streamflow(config.NWM_REACH, "short_range")
+        df = fetch() if fetch else asyncio.run(nwm.fetch_streamflow(config.NWM_REACH, "short_range"))
         q = nwm.daily_mean(df)
     except Exception:  # NWPS outages must not break the morning forecast
         return None

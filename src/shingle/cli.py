@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 from pathlib import Path
 
 from shingle import config, fetch, pipeline, webdata
@@ -43,7 +44,7 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
     if args.cmd == "fetch":
-        fetch.fetch_history(args.data_dir, refresh=args.refresh)
+        asyncio.run(fetch.fetch_history(args.data_dir, refresh=args.refresh))
     elif args.cmd == "update":
         pipeline.update_inputs(args.data_dir)
     elif args.cmd == "train":

@@ -46,22 +46,22 @@ def _base_params(cells: pd.DataFrame) -> dict:
     }
 
 
-def _get(url: str, params: dict, client: httpx.Client | None) -> dict | list:
-    client = client or httpx.Client(timeout=120)
-    resp = http.get(client, url, params=params)
+async def _get(url: str, params: dict, client: httpx.AsyncClient | None) -> dict | list:
+    async with http.session(client, timeout=120) as c:
+        resp = await http.get(c, url, params=params)
     return resp.json()
 
 
-def fetch_forecast(cells: pd.DataFrame, days: int = 16, client: httpx.Client | None = None) -> dict[str, pd.DataFrame]:
+async def fetch_forecast(cells: pd.DataFrame, days: int = 16, client: httpx.AsyncClient | None = None) -> dict[str, pd.DataFrame]:
     params = _base_params(cells) | {"forecast_days": days}
-    return parse(_get(FORECAST_URL, params, client), list(cells.index))
+    return parse(await _get(FORECAST_URL, params, client), list(cells.index))
 
 
-def fetch_historical_forecast(
-    cells: pd.DataFrame, start: str, end: str, client: httpx.Client | None = None
+async def fetch_historical_forecast(
+    cells: pd.DataFrame, start: str, end: str, client: httpx.AsyncClient | None = None
 ) -> dict[str, pd.DataFrame]:
     params = _base_params(cells) | {"start_date": start, "end_date": end}
-    return parse(_get(HISTORICAL_FORECAST_URL, params, client), list(cells.index))
+    return parse(await _get(HISTORICAL_FORECAST_URL, params, client), list(cells.index))
 
 
 PREVIOUS_RUNS_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
@@ -93,8 +93,8 @@ def parse_previous_runs(payload: dict | list, cell_ids: list[str], leads=(0, 1, 
     return out
 
 
-def fetch_previous_runs(
-    cells: pd.DataFrame, start: str, end: str, leads=(0, 1, 2, 3, 4, 5, 6, 7), client: httpx.Client | None = None
+async def fetch_previous_runs(
+    cells: pd.DataFrame, start: str, end: str, leads=(0, 1, 2, 3, 4, 5, 6, 7), client: httpx.AsyncClient | None = None
 ) -> dict[int, pd.DataFrame]:
     params = {
         "latitude": ",".join(f"{v:g}" for v in cells["lat"]),
@@ -104,4 +104,4 @@ def fetch_previous_runs(
         "end_date": end,
         "timezone": TIMEZONE,
     }
-    return parse_previous_runs(_get(PREVIOUS_RUNS_URL, params, client), list(cells.index), leads)
+    return parse_previous_runs(await _get(PREVIOUS_RUNS_URL, params, client), list(cells.index), leads)

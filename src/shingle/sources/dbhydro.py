@@ -72,30 +72,39 @@ def _date_chunks(start: str, end: str, years: int) -> list[tuple[pd.Timestamp, p
     return chunks
 
 
-def fetch(
+async def fetch(
     dbkeys: list[str],
     start: str,
     end: str,
-    client: httpx.Client | None = None,
+    client: httpx.AsyncClient | None = None,
     max_keys: int = 3,
     chunk_years: int = 10,
+    workers: int = 4,
 ) -> pd.DataFrame:
-    """Fetch in (key-group x decade) chunks - one big request gets its connection reset."""
-    client = client or httpx.Client(timeout=180)
+    """Fetch in (key-group x decade) chunks, `workers` at a time - one big request gets its connection reset."""
+
+    async def one(c: httpx.AsyncClient, group: list[str], cs: pd.Timestamp, ce: pd.Timestamp) -> pd.DataFrame:
+        params = {
+            "timeseriesIds": ",".join(group),
+            "reportType": "timeseries",
+            "format": "json",
+            "startDate": cs.strftime("%Y%m%d"),
+            "endDate": ce.strftime("%Y%m%d"),
+            "datum": "NGVD29",
+        }
+        return parse((await http.get(c, URL, params=params)).json())
+
+    chunks = [
+        (dbkeys[i : i + max_keys], cs, ce)
+        for i in range(0, len(dbkeys), max_keys)
+        for cs, ce in _date_chunks(start, end, chunk_years)
+    ]
+    async with http.session(client, timeout=180) as c:
+        parts = await http.gather((one(c, *ch) for ch in chunks), limit=workers)
+    # chunks cover separate keys / dates, so the order they are combined in does not matter
     result: pd.DataFrame | None = None
-    for i in range(0, len(dbkeys), max_keys):
-        group = dbkeys[i : i + max_keys]
-        for cs, ce in _date_chunks(start, end, chunk_years):
-            params = {
-                "timeseriesIds": ",".join(group),
-                "reportType": "timeseries",
-                "format": "json",
-                "startDate": cs.strftime("%Y%m%d"),
-                "endDate": ce.strftime("%Y%m%d"),
-                "datum": "NGVD29",
-            }
-            df = parse(http.get(client, URL, params=params).json())
-            result = df if result is None else df.combine_first(result)
+    for df in parts:
+        result = df if result is None else df.combine_first(result)
     result = result if result is not None else parse({})
     cols = [k for k in dbkeys if k in result.columns] + [c for c in result.columns if c not in dbkeys]
     out = result.reindex(columns=cols).sort_index()

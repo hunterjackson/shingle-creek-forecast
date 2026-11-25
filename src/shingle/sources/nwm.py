@@ -49,7 +49,7 @@ def daily_mean(df: pd.DataFrame) -> pd.Series:
     return out
 
 
-def fetch_streamflow(reach: str, series: str, client: httpx.Client | None = None) -> pd.DataFrame:
-    client = client or httpx.Client(timeout=60)
-    resp = http.get(client, f"{NWPS}/{reach}/streamflow", params={"series": series})
+async def fetch_streamflow(reach: str, series: str, client: httpx.AsyncClient | None = None) -> pd.DataFrame:
+    async with http.session(client, timeout=60) as c:
+        resp = await http.get(c, f"{NWPS}/{reach}/streamflow", params={"series": series})
     return parse_streamflow(resp.json())

@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import httpx
@@ -56,7 +57,7 @@ def test_fetch_requests_bbox_subset_per_year_and_concatenates():
         "http://thredds.northwestknowledge.net:8080/thredds/ncss/agg_met_pr_1979_CurrentYear_CONUS.nc"
     ).mock(return_value=httpx.Response(200, content=body))
 
-    df = gridmet.fetch("pr", BBOX, start="2023-12-30", end="2024-01-02")
+    df = asyncio.run(gridmet.fetch("pr", BBOX, start="2023-12-30", end="2024-01-02"))
 
     assert route.call_count == 2
     first = route.calls[0].request.url.params
@@ -77,4 +78,4 @@ def test_fetch_raises_on_http_error():
         return_value=httpx.Response(400, text="bad var")
     )
     with pytest.raises(httpx.HTTPStatusError):
-        gridmet.fetch("pr", BBOX, start="2024-01-01", end="2024-01-02")
+        asyncio.run(gridmet.fetch("pr", BBOX, start="2024-01-01", end="2024-01-02"))

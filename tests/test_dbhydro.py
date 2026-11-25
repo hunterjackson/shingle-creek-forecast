@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -56,7 +57,7 @@ def test_parse_empty_payload():
 def test_fetch_requests_ngvd29_and_dbkeys(payload):
     route = respx.get(URL).mock(return_value=httpx.Response(200, json=payload))
 
-    df = dbhydro.fetch(["68918", "91625"], start="2024-10-01", end="2024-10-05")
+    df = asyncio.run(dbhydro.fetch(["68918", "91625"], start="2024-10-01", end="2024-10-05"))
 
     p = route.calls.last.request.url.params
     assert p["timeseriesIds"] == "68918,91625"
@@ -101,7 +102,7 @@ def test_named_frame_splices_each_series():
 def test_fetch_chunks_by_key_group_and_years(payload):
     route = respx.get(URL).mock(return_value=httpx.Response(200, json=payload))
 
-    df = dbhydro.fetch(["68918", "91625", "LQ978"], start="2000-01-01", end="2024-12-31", max_keys=2, chunk_years=10)
+    df = asyncio.run(dbhydro.fetch(["68918", "91625", "LQ978"], start="2000-01-01", end="2024-12-31", max_keys=2, chunk_years=10))
 
     # 2 key groups x 3 date chunks (2000-09, 2010-19, 2020-24)
     assert route.call_count == 6
@@ -116,7 +117,7 @@ def test_fetch_retries_transient_connection_errors(payload):
         side_effect=[httpx.ConnectError("reset"), httpx.Response(200, json=payload)]
     )
 
-    df = dbhydro.fetch(["68918"], start="2024-10-01", end="2024-10-05")
+    df = asyncio.run(dbhydro.fetch(["68918"], start="2024-10-01", end="2024-10-05"))
 
     assert route.call_count == 2
     assert not df.empty

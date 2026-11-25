@@ -1,3 +1,4 @@
+import asyncio
 import gzip
 
 import httpx
@@ -63,7 +64,7 @@ def test_fetch_day_falls_back_to_second_product(monkeypatch):
     respx.get(urls[1]).mock(return_value=httpx.Response(200, content=gzip.compress(b"GRIB")))
     monkeypatch.setattr(mrms, "decode_grib", lambda raw: fake_grid(7.0))
 
-    s = mrms.fetch_day(pd.Timestamp("2024-10-09"), BBOX, client=httpx.Client())
+    s = asyncio.run(mrms.fetch_day(pd.Timestamp("2024-10-09"), BBOX, client=httpx.AsyncClient()))
 
     assert s.name == pd.Timestamp("2024-10-09")
     assert s.dropna().eq(7.0).all()
@@ -74,11 +75,11 @@ def test_fetch_day_all_missing_returns_none():
     for u in mrms.candidate_urls(pd.Timestamp("2024-10-09")):
         respx.get(u).mock(return_value=httpx.Response(404))
 
-    assert mrms.fetch_day(pd.Timestamp("2024-10-09"), BBOX, client=httpx.Client()) is None
+    assert asyncio.run(mrms.fetch_day(pd.Timestamp("2024-10-09"), BBOX, client=httpx.AsyncClient())) is None
 
 
 def test_fetch_range_builds_wide_frame_and_skips_missing(monkeypatch):
-    def fake_day(day, bbox, client=None, hour=5):
+    async def fake_day(day, bbox, client=None, hour=5):
         if day == pd.Timestamp("2024-01-02"):
             return None
         s = mrms.crop(fake_grid(float(day.day)), bbox)
@@ -87,7 +88,7 @@ def test_fetch_range_builds_wide_frame_and_skips_missing(monkeypatch):
 
     monkeypatch.setattr(mrms, "fetch_day", fake_day)
 
-    df = mrms.fetch("2024-01-01", "2024-01-03", BBOX, workers=2)
+    df = asyncio.run(mrms.fetch("2024-01-01", "2024-01-03", BBOX, workers=2))
 
     assert df.index.name == "date"
     assert list(df.index) == list(pd.date_range("2024-01-01", "2024-01-03"))
@@ -97,7 +98,7 @@ def test_fetch_range_builds_wide_frame_and_skips_missing(monkeypatch):
 
 @pytest.mark.live
 def test_live_decode_real_file():
-    s = mrms.fetch_day(pd.Timestamp("2024-10-09"), BBOX)
+    s = asyncio.run(mrms.fetch_day(pd.Timestamp("2024-10-09"), BBOX))
     assert s is not None and s.size == 44 * 30
     assert 100 < s.mean() < 200  # Milton
 
@@ -111,7 +112,7 @@ def test_urls_for_gridmet_day_end_at_12z_next_day():
 def test_fetch_passes_hour_through(monkeypatch):
     seen = []
 
-    def fake_day(day, bbox, client=None, hour=5):
+    async def fake_day(day, bbox, client=None, hour=5):
         seen.append(hour)
         s = mrms.crop(fake_grid(1.0), bbox)
         s.name = day
@@ -119,6 +120,6 @@ def test_fetch_passes_hour_through(monkeypatch):
 
     monkeypatch.setattr(mrms, "fetch_day", fake_day)
 
-    mrms.fetch("2024-01-01", "2024-01-02", BBOX, workers=1, hour=12)
+    asyncio.run(mrms.fetch("2024-01-01", "2024-01-02", BBOX, workers=1, hour=12))
 
     assert seen == [12, 12]

@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import httpx
@@ -50,7 +51,7 @@ def test_fetch_run_uses_byte_ranges_and_stacks_buckets():
     respx.get(url__regex=r".*\.idx$").mock(return_value=httpx.Response(200, text=text))
     data_route = respx.get(url__regex=r".*0p50\.f0\d\d$").mock(return_value=httpx.Response(206, content=raw))
 
-    df = gefs.fetch_run(RUN, fhours=(18, 24), bbox=BBOX)
+    df = asyncio.run(gefs.fetch_run(RUN, fhours=(18, 24), bbox=BBOX))
 
     assert list(df.index) == [18, 24]
     assert df.index.name == "fhour"
@@ -61,7 +62,7 @@ def test_fetch_run_uses_byte_ranges_and_stacks_buckets():
 def test_fetch_run_returns_none_when_run_missing():
     with respx.mock:
         respx.get(url__regex=r".*").mock(return_value=httpx.Response(404))
-        assert gefs.fetch_run(RUN, fhours=(6,), bbox=BBOX) is None
+        assert asyncio.run(gefs.fetch_run(RUN, fhours=(6,), bbox=BBOX)) is None
 
 
 def test_daily_leads_sums_12z_windows_per_issue_day():
@@ -95,7 +96,7 @@ def test_fetch_run_retries_transient_errors():
     respx.get(url__regex=r".*\.idx$").mock(side_effect=[httpx.ConnectTimeout("handshake"), httpx.Response(200, text=text)])
     respx.get(url__regex=r".*0p50\.f0\d\d$").mock(side_effect=[httpx.ReadTimeout("slow"), httpx.Response(206, content=raw)])
 
-    df = gefs.fetch_run(RUN, fhours=(24,), bbox=BBOX)
+    df = asyncio.run(gefs.fetch_run(RUN, fhours=(24,), bbox=BBOX))
 
     assert list(df.index) == [24]
 
@@ -107,3 +108,11 @@ def test_grid_lons_handle_wrapped_grids():
     e = gefs.grid_lons(180.0, 900, 0.4)
     assert e[0] == -180.0 and e[-1] == pytest.approx(179.6)
     assert np.argmin(np.abs(e - (-81.2))) == round((180 - 81.2) / 0.4)
+
+
+@respx.mock
+def test_fetch_run_missing_run_costs_one_request():
+    route = respx.get(url__regex=r".*\.idx$").mock(return_value=httpx.Response(404))
+
+    assert asyncio.run(gefs.fetch_run(RUN, bbox=BBOX)) is None
+    assert route.call_count == 1
