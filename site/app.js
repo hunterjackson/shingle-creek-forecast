@@ -35,6 +35,52 @@ async function getJSON(path) {
   return r.json();
 }
 
+/* ---------------- live gauge readings ---------------- */
+
+// The data files are refreshed every 3 hours by the forecast job; the gauge reports every 15 minutes. Top up
+// the readings straight from USGS (CORS is open) so the current level is never more than a reading behind.
+const USGS_IV = "https://waterservices.usgs.gov/nwis/iv/?format=json&sites=02264495&parameterCd=00065&siteStatus=all";
+
+// USGS instantaneous-value JSON -> [{t: Date, v: ft}], sorted, no-data dropped.
+function parseIV(js) {
+  const out = [];
+  for (const ts of (js.value && js.value.timeSeries) || []) {
+    const nd = Number(ts.variable.noDataValue);
+    for (const blk of ts.values) for (const r of blk.value) {
+      const v = Number(r.value);
+      if (Number.isFinite(v) && v !== nd) out.push({ t: new Date(r.dateTime), v });
+    }
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+// Merge readings into obs.hourly (hourly means labelled by the UTC hour's start, as the pipeline writes them;
+// hours from the first live reading's hour on are recomputed, so a partial last hour is completed) and point
+// fc.current at the latest reading. Returns true if anything newer than the data files arrived.
+function mergeLive(fc, obs, readings) {
+  if (!readings.length) return false;
+  const last = readings[readings.length - 1];
+  if (fc.current && fc.current.time && last.t <= new Date(fc.current.time)) return false;
+  const hourStart = (t) => Math.floor(t.getTime() / 3600e3) * 3600e3;
+  const from = hourStart(readings[0].t);
+  const bins = new Map();
+  for (const r of readings) { const k = hourStart(r.t); const b = bins.get(k) || [0, 0]; b[0] += r.v; b[1] += 1; bins.set(k, b); }
+  const kept = (obs.hourly || []).filter((h) => Date.parse(h.time) < from);
+  const added = [...bins.entries()].sort((a, b) => a[0] - b[0])
+    .map(([k, [s, n]]) => ({ time: new Date(k).toISOString(), stage: Math.round((s / n) * 100) / 100 }));
+  obs.hourly = kept.concat(added);
+  fc.current = { stage_ft: last.v, time: last.t.toISOString(), category: category(last.v, fc.flood_stages), live: true };
+  return true;
+}
+
+async function topUpLive(fc, obs) {
+  const hourly = obs.hourly || [];
+  const since = hourly.length ? hourly[hourly.length - 1].time : new Date(Date.now() - 6 * 3600e3).toISOString();
+  const r = await fetch(`${USGS_IV}&startDT=${encodeURIComponent(since)}`, { cache: "no-cache" });
+  if (!r.ok) throw new Error(`USGS: HTTP ${r.status}`);
+  return mergeLive(fc, obs, parseIV(await r.json()));
+}
+
 /* ---------------- reading + headline ---------------- */
 
 function trend24h(hourly) {
@@ -210,6 +256,9 @@ function renderHydro(fc, obs) {
   const hourly = (obs.hourly || []).filter((r) => r.stage !== null).map((r) => ({ t: new Date(r.time), v: r.stage }));
   const hourlyStart = hourly.length ? hourly[0].t : now;
   const obsLine = daily.filter((r) => day(r.date) < hourlyStart).map((r) => ({ t: day(r.date), v: r.stage })).concat(hourly);
+  // end the line at the latest reading itself (hourly points are means labelled by the hour's start)
+  const cur = fc.current && fc.current.stage_ft !== null && fc.current.time ? { t: new Date(fc.current.time), v: fc.current.stage_ft } : null;
+  if (cur && (!obsLine.length || cur.t > obsLine[obsLine.length - 1].t)) obsLine.push(cur);
 
   // Each forecast is that day's expected average, so it is drawn as a step spanning the gauge's day, not a point.
   const fcSteps = rows.map((r) => { const [a, b] = gaugeDay(r.date); return { a, b, v: r.p50, lo: r.p10 ?? r.p50, hi: r.p90 ?? r.p50 }; });
@@ -272,7 +321,7 @@ function renderHydro(fc, obs) {
     if (d.obs !== undefined || now < a || now >= b) continue;
     const today = hourly.filter((h) => h.t >= a && h.t < b);
     if (today.length) {
-      d.latest = today[today.length - 1];
+      d.latest = cur || today[today.length - 1];
       d.soFar = today.reduce((s, h) => s + h.v, 0) / today.length;
     }
   }
@@ -385,6 +434,11 @@ async function main() {
   let raf = 0;
   window.addEventListener("resize", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => renderHydro(fc, obs)); });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  // newer gauge readings from USGS; on any failure the page keeps the data files' readings
+  const refresh = () => topUpLive(fc, obs).then((changed) => { if (changed) { renderReading(fc, obs); draw(); } })
+    .catch((err) => console.warn("live readings unavailable:", err));
+  refresh();
+  setInterval(refresh, 15 * 60e3);
 }
 
 main();
