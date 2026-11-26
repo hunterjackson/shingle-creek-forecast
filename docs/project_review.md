@@ -93,3 +93,18 @@ Checked against `shingle_findings.md`, `model_test_plan.md` and `divergence_test
 | 3 | **Era-aware rating and runoff model**: recent-years fit or recency weights, instead of one fit to 1979–now | Floods, days 3–7 | Item 4 above; rating 0.27 ft low at high flow today | Medium |
 | 4 | Rate of rise at issue time, at the gauge and upstream (hourly) | Days 1–7, rising water | Weak: −2 % at day 1, −5 % on rising days at day 5; flood days slightly worse. Mostly covered by 1 | Small |
 | 5 | Latest complete GEFS run at issue time (06Z instead of 00Z) | Day 7 | Side note in T6: the 12Z run was 2–5 % better at day 7; never tested | Small |
+
+## Outcome (2026-11-26)
+
+Each idea was tested out of fold (2007-10..2023, then forecast mode with issued GEFS 2020-10..2023) and built only
+where the gain was clear. Scripts and reports: `experiments/improve/`. The test period was not used.
+
+| # | Idea | Result | Status |
+|---|---|---|---|
+| 1 | Anchor day 1 on the morning reading | LightGBM (L1) on day-1 mean − issue reading, trained on 2007+ days only: 0.0355 → 0.0205 ft (−42 %); forecast mode 0.0345 → 0.0194 (−44 %, CI −0.023..−0.009); flood days 0.29 → 0.02. Training the same tree on all rows (pre-2007 without the reading) loses most of the gain: this mixing was the cause of finding 1 | **Built** (`models/anchor.py`, `Blend.day1`) |
+| 2 | Update today's figure through the day | Against the new day 1: −1 % at 11:30 am, −12 % at 2:30 pm, −42 % at 5:30 pm, −74 % at 8:30 pm EST | **Built** (`nowcast.py`, `pipeline.update_today`; site shows the issued value too) |
+| — | Log keeps the issued forecast (items 2–3) | First logged forecast of an issue day kept; reruns only fill gaps | **Fixed** (`forecast_log.append`). NWM value is still a partial-day mean |
+| 3a | Era-aware rating | Rating refit on years near the held-out block: MAE unchanged, flood days at days 5–7 worse | Rejected |
+| 3b | Era-aware GR4J | Calibrated 2008–21: better flow fit, forecast unchanged at days 1–5, day 7 +1.2 % worse | Rejected |
+| 4 | Rate of rise (6 h / 12 h, gauge and upstream) | Day 1 (in the anchored model): −2.4 %, CI −0.0007..−0.0003 | **Built** for day 1 |
+| 5 | 06Z GEFS run at issue | Available by ~11:03Z. Not pulled: the 12Z run (twice as fresh) gave −2.4..+2.4 % across days 1–7 in T6, worse at days 1 and 4; day 1 no longer depends on rain much | Not pursued |
