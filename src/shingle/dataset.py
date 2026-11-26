@@ -20,6 +20,14 @@ def issue_reading(hourly: pd.Series, index: pd.DatetimeIndex, hour_utc: int = IS
     return last.reindex(index)
 
 
+def hour_reading(hourly: pd.Series, index: pd.DatetimeIndex, hour_utc: int) -> pd.Series:
+    """The hourly value labelled hour_utc on day t+1 (UTC), labelled t; NaN when that hour is missing."""
+    s = hourly.dropna()
+    s = s[s.index.hour == hour_utc]
+    v = pd.Series(s.to_numpy(), index=s.index.tz_localize(None).normalize() - pd.Timedelta(days=1))
+    return v[~v.index.duplicated(keep="last")].reindex(index)
+
+
 def morning_mean(hourly: pd.Series, index: pd.DatetimeIndex, first_hour_utc: int = 5, hour_utc: int = ISSUE_HOUR_UTC) -> pd.Series:
     """Mean of the hourly values labelled first_hour_utc..hour_utc on day t+1 (UTC), labelled t.
 
@@ -60,6 +68,10 @@ def build_data(history: dict, rain: pd.DataFrame | None = None, pet: pd.DataFram
         d["stage_am"] = issue_reading(iv["gauge"]["stage_ft"], idx)
         d["q_am"] = issue_reading(iv["gauge"]["discharge_cfs"], idx)
         d["stage_sofar"] = morning_mean(iv["gauge"]["stage_ft"], idx)
+        d["stage_h06"] = hour_reading(iv["gauge"]["stage_ft"], idx, 6)  # rate of rise into the issue reading
+        d["stage_h00"] = hour_reading(iv["gauge"]["stage_ft"], idx, 0)
     if iv.get("upstream") is not None:
         d["q_up_am"] = issue_reading(iv["upstream"]["discharge_cfs"], idx)
+        d["q_up_h06"] = hour_reading(iv["upstream"]["discharge_cfs"], idx, 6)
+        d["q_up_h00"] = hour_reading(iv["upstream"]["discharge_cfs"], idx, 0)
     return d

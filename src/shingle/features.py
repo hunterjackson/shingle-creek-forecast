@@ -25,6 +25,9 @@ only for longer horizons).
                        (data['stage_am'|'q_am'|'q_up_am'], see dataset.issue_reading)
   stage_sofar_d        mean of the day-1 target's hours seen at issue (midnight..8 am EST) minus the
                        issue reading (data['stage_sofar'], see dataset.morning_mean)
+  stage_slope{6,12}, up_slope{6,12}
+                       rate of rise: issue reading minus the reading 6 / 12 h earlier (06Z / 00Z of t+1),
+                       gauge stage and upstream log1p flow (data['stage_h06'|'stage_h00'|'q_up_h06'|'q_up_h00'])
 
 `data` keys: stage, q, q_up (Series); pr, pet (wide per-cell frames);
 toho, s61_q, s59_q, etoho (Series) when lake features are used.
@@ -43,6 +46,8 @@ _CELL = re.compile(r"^(pr_past|pr_next|wb_past)(\d+|H)__(.+)$")
 _DSTAGE = re.compile(r"^dstage_(\d+)$")
 _DTOHO = re.compile(r"^dtoho_(\d+)$")
 _LOGQ_D = re.compile(r"^log_q_d(\d+)$")
+_SLOPES = {"stage_slope6": ("stage_am", "stage_h06"), "stage_slope12": ("stage_am", "stage_h00"),
+           "up_slope6": ("q_up_am", "q_up_h06"), "up_slope12": ("q_up_am", "q_up_h00")}
 
 
 def _fcst(data: dict, horizon: int | None) -> dict:
@@ -92,6 +97,13 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
         return np.log1p(data["s59_q"].clip(lower=0))
     if name == "etoho":
         return data["etoho"]
+    if name in _SLOPES:
+        now, before = _SLOPES[name]
+        if now not in data or before not in data:
+            return pd.Series(np.nan, index=index)
+        if now == "stage_am":
+            return data[now] - data[before]
+        return np.log1p(data[now].clip(lower=0)) - np.log1p(data[before].clip(lower=0))
     if name == "stage_sofar_d":
         if "stage_sofar" not in data or "stage_am" not in data:
             return pd.Series(np.nan, index=index)

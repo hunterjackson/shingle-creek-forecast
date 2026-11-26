@@ -37,6 +37,6 @@ def test_day_one_is_anchored_on_the_morning_reading():
     m = spec.build_model(horizons=(1, 4))
 
     assert isinstance(m.day1, anchor.MorningAnchor)
-    assert {"stage_am_d", "stage_sofar_d", f"pr_nextH__{config.RAIN_CELL}"} <= set(m.day1.features)
+    assert {"stage_am_d", "stage_sofar_d", f"pr_nextH__{config.RAIN_CELL}", "stage_slope6", "up_slope12"} <= set(m.day1.features)
     assert spec.build_model(horizons=(2, 4)).day1 is None
     assert not any("next" in f for f in spec.build_model(horizons=(1,), future_rain=False).day1.features)

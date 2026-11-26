@@ -228,3 +228,16 @@ def test_morning_mean_feature_is_mean_so_far_minus_issue_reading(data):
 
     np.testing.assert_allclose(X["stage_sofar_d"], -0.2)
     assert features.build(data, ["stage_sofar_d"])["stage_sofar_d"].isna().all()
+
+
+def test_rate_of_rise_features_compare_issue_reading_with_earlier_hours(data):
+    d = dict(data, stage_am=data["stage"] + 0.3, stage_h06=data["stage"] + 0.1, stage_h00=data["stage"],
+             q_up_am=data["q_up"] * 2, q_up_h06=data["q_up"], q_up_h00=data["q_up"] / 2)
+
+    X = features.build(d, ["stage_slope6", "stage_slope12", "up_slope6", "up_slope12"])
+
+    np.testing.assert_allclose(X["stage_slope6"], 0.2)
+    np.testing.assert_allclose(X["stage_slope12"], 0.3)
+    np.testing.assert_allclose(X["up_slope6"], np.log1p(d["q_up"] * 2) - np.log1p(d["q_up"]))
+    np.testing.assert_allclose(X["up_slope12"], np.log1p(d["q_up"] * 2) - np.log1p(d["q_up"] / 2))
+    assert features.build(data, ["stage_slope6", "up_slope12"]).isna().all().all()

@@ -14,7 +14,8 @@ import pandas as pd
 
 from shingle import features
 
-OPTIONAL = ("log_q_am_d", "log_q_up_am_d")  # upstream/flow readings may be missing; LightGBM handles NaN
+# readings that may be missing (a gap in an hour, upstream gauge down); LightGBM handles NaN
+OPTIONAL = ("log_q_am_d", "log_q_up_am_d", "stage_slope6", "stage_slope12", "up_slope6", "up_slope12")
 
 
 class MorningAnchor:

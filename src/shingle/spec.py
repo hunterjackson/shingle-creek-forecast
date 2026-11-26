@@ -19,7 +19,8 @@ RATING_OPTS = {"floodplain": True, "d_max": 1.2, "g_min": 0.3}
 AM_MAX_H = 3
 AM_FLOW = ["log_q_am_d", "log_q_up_am_d"]
 AM_STAGE = AM_FLOW + ["stage_am_d"]
-DAY1_EXTRA = ["stage_sofar_d"]
+SLOPES = ["stage_slope6", "stage_slope12", "up_slope6", "up_slope12"]
+DAY1_EXTRA = ["stage_sofar_d"] + SLOPES  # rate of rise: -2.4 % at day 1 (experiments/improve/i4_report.txt)
 GR4J = ["gr4j_logq", "gr4j_dH", "gr4j_s", "gr4j_r"]
 
 

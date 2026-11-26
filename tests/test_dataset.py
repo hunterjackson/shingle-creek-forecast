@@ -111,3 +111,34 @@ def test_build_data_adds_morning_mean_when_iv_present():
     }
 
     assert dataset.build_data(history)["stage_sofar"].tolist() == [55.5] * 3
+
+
+def test_hour_reading_takes_one_labelled_hour_of_next_day():
+    t = pd.date_range("2020-01-01 00:00", "2020-01-03 23:00", freq="1h", tz="UTC")
+    hourly = pd.Series(np.arange(len(t), dtype=float), index=t)
+    hourly[pd.Timestamp("2020-01-03 06:00", tz="UTC")] = np.nan
+    day = pd.date_range("2020-01-01", periods=3, name="date")
+
+    r = dataset.hour_reading(hourly, day, 6)
+
+    assert r.loc["2020-01-01"] == hourly[pd.Timestamp("2020-01-02 06:00", tz="UTC")]
+    assert np.isnan(r.loc["2020-01-02"]) and np.isnan(r.loc["2020-01-03"])  # missing hour stays missing
+
+
+def test_build_data_adds_earlier_morning_readings_for_rate_of_rise():
+    idx = pd.date_range("2020-01-01", periods=3, name="date")
+    t = pd.date_range("2020-01-01", "2020-01-04 23:00", freq="1h", tz="UTC")
+    iv = pd.DataFrame({"discharge_cfs": 200.0, "stage_ft": 55.5}, index=t)
+    history = {
+        "gauge": pd.DataFrame({"discharge_cfs": 1.0, "stage_ft": 54.0}, index=idx),
+        "upstream": pd.DataFrame({"discharge_cfs": 1.0}, index=idx),
+        "lakes": pd.DataFrame({"toho_stage": 53.0, "s61_q": 1.0, "s59_q": 1.0, "etoho_stage": 56.0}, index=idx),
+        "pr": pd.DataFrame({"g": 1.0}, index=idx),
+        "pet": pd.DataFrame({"g": 4.0}, index=idx),
+        "iv": {"gauge": iv, "upstream": iv * 0.5},
+    }
+
+    d = dataset.build_data(history)
+
+    assert d["stage_h06"].tolist() == [55.5] * 3 and d["stage_h00"].tolist() == [55.5] * 3
+    assert d["q_up_h06"].tolist() == [100.0] * 3 and d["q_up_h00"].tolist() == [100.0] * 3
