@@ -29,3 +29,14 @@ def test_rain_features_use_configured_cell_and_nofut_strips_future():
     n = spec.build_model(horizons=(3,), future_rain=False)
     names = n.a.feature_names(3) + n.b.flow.feature_names(3) + n.b.lake.feature_names(3)
     assert not any("next" in f for f in names) and "gr4j_dH" not in names
+
+
+def test_day_one_is_anchored_on_the_morning_reading():
+    from shingle.models import anchor
+
+    m = spec.build_model(horizons=(1, 4))
+
+    assert isinstance(m.day1, anchor.MorningAnchor)
+    assert {"stage_am_d", "stage_sofar_d", f"pr_nextH__{config.RAIN_CELL}"} <= set(m.day1.features)
+    assert spec.build_model(horizons=(2, 4)).day1 is None
+    assert not any("next" in f for f in spec.build_model(horizons=(1,), future_rain=False).day1.features)

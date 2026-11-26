@@ -71,9 +71,7 @@ def perfect_oof(data: dict, tr: pd.DatetimeIndex, held_index: pd.DatetimeIndex, 
         held = held_index[held_index.year.isin(blk)]
         start = pd.Timestamp(f"{blk[0]}-01-01")
         fit_ix = tr[~tr.year.isin(blk) & ~((tr < start) & (tr >= start - pd.Timedelta(days=gap_days)))]
-        m = spec.build_model(horizons)
-        m.a.fit(data, fit_ix)
-        m.b.fit(data, fit_ix)
+        m = spec.build_model(horizons).fit_members(data, fit_ix)
         parts.append(m.point(data, held))
     return pd.concat(parts).sort_index()
 
@@ -133,9 +131,7 @@ def train(
         parts = []
         for yr in sorted(set(fc_idx.year)):
             held = fc_idx[fc_idx.year == yr]
-            m = spec.build_model(horizons)
-            m.a.fit(data, tr[tr.year != yr])
-            m.b.fit(data, tr[tr.year != yr])
+            m = spec.build_model(horizons).fit_members(data, tr[tr.year != yr])
             parts.append(m.point(d_fc, held))
         preds_fc = pd.concat(parts)
         _set_bands(model, preds_fc, d_fc, fc_idx)

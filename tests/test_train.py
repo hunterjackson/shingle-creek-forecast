@@ -73,7 +73,7 @@ def test_backtest_matches_single_day_predict(trained):
 
 @pytest.fixture(scope="module")
 def trained_oof():
-    hist, raw, src = make_world(n_days=6 * 365, start="2016-01-01")
+    hist, raw, src = make_world(n_days=6 * 365, start="2016-01-01", iv=True)
     data = dataset.build_data(hist)
     idx = data["stage"].index
     art = train.train(hist, raw, src, train_end=str(idx[5 * 365].date()), fcst_start=str(idx[3 * 365].date()), horizons=H,
@@ -140,3 +140,17 @@ def test_oof_training_widens_days_1_to_3_when_rain_is_forecast(trained_oof):
 
     assert width(w_wet) in set(np.round(b1.bins.hi - b1.bins.lo, 9))
     assert width(w_dry) in set(np.round(b1.base.hi - b1.base.lo, 9))
+
+
+def test_day_one_comes_from_the_morning_anchored_model_when_readings_exist(trained_oof):
+    hist, raw, src, art = trained_oof
+    day = pd.Timestamp(hist["gauge"].index[5 * 365 + 30])
+    data = dataset.build_data(hist)
+
+    fc = train.predict(art, hist, raw, src, issue_day=day)
+
+    assert art.model.day1.n_train > 0
+    d = train._forecast_data(train._with_gr4j(hist, art.gr4j), hist, raw, src, art.gr4j, art.scale, art.horizons)
+    want = art.model.day1.point(d, pd.DatetimeIndex([day]))["h1"].iloc[0]
+    assert np.isfinite(want) and fc["p50"].iloc[0] == pytest.approx(want)
+    assert abs(want - data["stage_am"].loc[day]) < 0.5

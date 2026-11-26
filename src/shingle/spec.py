@@ -3,13 +3,15 @@
 Blend (0.5/0.5 per horizon) of
   * ARX: LightGBM on the h-day stage change (state, lake, rain, GR4J, morning reading h<=3)
   * RatingHybrid: LightGBM flow + Toho forecasts -> floodplain CombinedRating, residual carry
+Day 1 is replaced, wherever the morning reading exists, by MorningAnchor: LightGBM (L1) on day-1 mean minus the
+issue reading, stage features + morning readings + the midnight-8 am mean (docs/project_review.md, idea 1).
 Morning (issue-time) readings only for h <= 3 and allowed missing (exist from 2007).
 """
 
 from __future__ import annotations
 
 from shingle import config
-from shingle.models import arx, blend, direct, hybrid
+from shingle.models import anchor, arx, blend, direct, hybrid
 from shingle.models.base import HORIZONS
 
 LGBM_PARAMS = {"n_estimators": 300, "learning_rate": 0.05, "num_leaves": 63, "min_child_samples": 20}
@@ -17,6 +19,7 @@ RATING_OPTS = {"floodplain": True, "d_max": 1.2, "g_min": 0.3}
 AM_MAX_H = 3
 AM_FLOW = ["log_q_am_d", "log_q_up_am_d"]
 AM_STAGE = AM_FLOW + ["stage_am_d"]
+DAY1_EXTRA = ["stage_sofar_d"]
 GR4J = ["gr4j_logq", "gr4j_dH", "gr4j_s", "gr4j_r"]
 
 
@@ -52,4 +55,5 @@ def build_model(horizons=HORIZONS, future_rain: bool = True, cell: str = config.
         hs,
         rating_opts=RATING_OPTS,
     )
-    return blend.Blend(a, b, weights=0.5, horizons=hs)
+    day1 = anchor.MorningAnchor(fs["stage"] + AM_STAGE + DAY1_EXTRA, lgbm_params=LGBM_PARAMS) if 1 in hs else None
+    return blend.Blend(a, b, weights=0.5, horizons=hs, day1=day1)

@@ -7,7 +7,7 @@ from shingle import config
 from shingle.sources import gridmet
 
 
-def make_world(n_days: int = 4 * 365, start: str = "2018-01-01", seed: int = 0):
+def make_world(n_days: int = 4 * 365, start: str = "2018-01-01", seed: int = 0, iv: bool = False):
     rng = np.random.default_rng(seed)
     idx = pd.date_range(start, periods=n_days, name="date")
     cells = pd.DataFrame(
@@ -38,4 +38,12 @@ def make_world(n_days: int = 4 * 365, start: str = "2018-01-01", seed: int = 0):
     raw = pd.DataFrame(
         {(k, c): 0.7 * pd.Series(rain, index=idx).shift(-k) * rng.lognormal(0, 0.3, n_days) for k, c in cols}, index=idx
     )[cols]
+    if iv:  # hourly record: daily means placed at noon EST (17Z), interpolated, plus noise
+        t = pd.date_range(idx[0], idx[-1] + pd.Timedelta(hours=23), freq="1h", tz="UTC")
+        noon = pd.DatetimeIndex(idx + pd.Timedelta(hours=17)).tz_localize("UTC")
+        def hourly(v):
+            s = pd.Series(np.interp(t.asi8, noon.asi8, v), index=t)
+            return s + rng.normal(0, 0.003, len(t)) * s.abs().mean() / 50
+        hist["iv"] = {"gauge": pd.DataFrame({"stage_ft": hourly(stage), "discharge_cfs": hourly(q)}),
+                      "upstream": pd.DataFrame({"discharge_cfs": hourly(q * 0.5)})}
     return hist, raw, src
