@@ -18,7 +18,7 @@ concurrency:
 jobs:
   forecast:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -47,8 +47,17 @@ jobs:
 
       - run: uv sync --locked
 
+      # Data servers (gridMET's THREDDS, USGS, GEFS on S3) occasionally refuse connections for
+      # minutes at a time; the in-code retries only span ~50 s. Wait and try again rather than
+      # skip the run: fetches are incremental, so each retry is a handful of small requests.
+      # Nothing is logged or written to the site until the fetch succeeds.
       - name: Forecast
-        run: uv run shingle predict --log site/data/forecast_log.csv
+        run: |
+          for wait in 0 600 1200; do
+            if [ "$wait" -gt 0 ]; then echo "::warning::predict failed; retrying in $((wait / 60)) min"; sleep "$wait"; fi
+            uv run shingle predict --log site/data/forecast_log.csv && exit 0
+          done
+          exit 1
 
       - name: Build site data
         run: uv run shingle site --log site/data/forecast_log.csv --out-dir site/data
