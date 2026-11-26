@@ -2,6 +2,10 @@
 
 NWPS only serves the NWM short-range (18 h) series for our reach (medium/long range
 come back empty), so NWM is logged for h1 only, converted to stage with our rating.
+
+The forecast job reruns every 3 h until the next issue day. The log keeps the first forecast logged for an issue
+day (the one issued at ~13:30Z); later runs only fill values that were missing (an input absent at issue, or the
+NWM value). Before 2026-11-26 every rerun overwrote the row (docs/project_review.md, items 2 and 3).
 """
 
 from __future__ import annotations
@@ -22,6 +26,15 @@ def append(path, doc: dict, nwm_stage_h1: float | None = None) -> pd.DataFrame:
     new = pd.DataFrame(rows, columns=COLUMNS)
     if path.exists():
         old = pd.read_csv(path)
+        same = old[old["issue_day"] == doc["issue_day"]].set_index("h")
+        if len(same):
+            new = new.set_index("h")
+            keep = same.reindex(new.index)
+            have = keep["p50"].notna()
+            for c in ("date", "p10", "p50", "p90"):
+                new[c] = new[c].astype(object).where(~have, keep[c])
+            new["nwm_p50"] = keep["nwm_p50"].where(keep["nwm_p50"].notna(), new["nwm_p50"])
+            new = new.reset_index()[COLUMNS]
         old = old[old["issue_day"] != doc["issue_day"]]
         new = pd.concat([old, new], ignore_index=True)
     new = new.sort_values(["issue_day", "h"]).reset_index(drop=True)

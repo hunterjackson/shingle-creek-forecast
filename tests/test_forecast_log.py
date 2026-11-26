@@ -9,18 +9,34 @@ def doc(issue, p50s):
     return {"issue_day": issue, "forecast": [{"date": d.strftime("%Y-%m-%d"), "p10": p - 0.5, "p50": p, "p90": p + 0.5} for d, p in zip(days, p50s)]}
 
 
-def test_append_writes_one_row_per_horizon_and_replaces_same_issue_day(tmp_path):
+def test_append_keeps_the_first_issued_forecast_of_an_issue_day(tmp_path):
+    """Reruns of the same issue day (every 3 h until the next issue) must not rewrite the logged forecast."""
     path = tmp_path / "log.csv"
 
     forecast_log.append(path, doc("2024-10-09", [55.0, 56.0]), nwm_stage_h1=55.4)
-    forecast_log.append(path, doc("2024-10-09", [55.1, 56.1]), nwm_stage_h1=55.5)  # rerun same morning
+    forecast_log.append(path, doc("2024-10-09", [55.1, 56.1]), nwm_stage_h1=55.5)  # rerun later that day
+    forecast_log.append(path, doc("2024-10-09", [55.2, 56.2]), nwm_stage_h1=None)  # NWM series no longer has day 1
     forecast_log.append(path, doc("2024-10-10", [56.5, 57.0]), nwm_stage_h1=None)
 
     log = pd.read_csv(path)
     assert len(log) == 4
-    assert log.loc[(log.issue_day == "2024-10-09") & (log.h == 1), "p50"].item() == 55.1
-    assert log.loc[(log.issue_day == "2024-10-09") & (log.h == 1), "nwm_p50"].item() == 55.5
+    assert log.loc[(log.issue_day == "2024-10-09") & (log.h == 1), "p50"].item() == 55.0
+    assert log.loc[(log.issue_day == "2024-10-09") & (log.h == 2), "p50"].item() == 56.0
+    assert log.loc[(log.issue_day == "2024-10-09") & (log.h == 1), "nwm_p50"].item() == 55.4
     assert pd.isna(log.loc[(log.issue_day == "2024-10-09") & (log.h == 2), "nwm_p50"].item())
+
+
+def test_append_fills_values_the_first_run_could_not_produce(tmp_path):
+    path = tmp_path / "log.csv"
+    first = doc("2024-10-09", [55.0, 56.0])
+    first["forecast"][1].update(p10=None, p50=None, p90=None)  # an input was missing for day 2
+
+    forecast_log.append(path, first, nwm_stage_h1=None)
+    forecast_log.append(path, doc("2024-10-09", [55.1, 56.1]), nwm_stage_h1=55.5)
+
+    log = pd.read_csv(path).set_index("h")
+    assert log.loc[1, "p50"] == 55.0 and log.loc[2, "p50"] == 56.1 and log.loc[2, "p90"] == 56.6
+    assert log.loc[1, "nwm_p50"] == 55.5
 
 
 def test_score_compares_model_and_nwm_with_observations(tmp_path):
