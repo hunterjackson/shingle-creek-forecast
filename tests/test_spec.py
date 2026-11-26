@@ -40,3 +40,12 @@ def test_day_one_is_anchored_on_the_morning_reading():
     assert {"stage_am_d", "stage_sofar_d", f"pr_nextH__{config.RAIN_CELL}", "stage_slope6", "up_slope12"} <= set(m.day1.features)
     assert spec.build_model(horizons=(2, 4)).day1 is None
     assert not any("next" in f for f in spec.build_model(horizons=(1,), future_rain=False).day1.features)
+
+
+def test_stage_model_gets_rate_of_rise_at_every_horizon_allowed_missing():
+    m = spec.build_model(horizons=(2, 5, 7))
+
+    for h in (2, 5, 7):
+        assert set(spec.SLOPES) <= set(m.a.feature_names(h))
+    assert set(spec.SLOPES) <= m.a.reg.allow_missing
+    assert not set(spec.SLOPES) & set(m.b.flow.feature_names(2))  # flow model unchanged (worse floods/low water)

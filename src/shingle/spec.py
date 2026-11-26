@@ -47,9 +47,10 @@ def build_model(horizons=HORIZONS, future_rain: bool = True, cell: str = config.
     if not future_rain:
         fs = {k: [f for f in v if not _future(f)] for k, v in fs.items()}
     hs = tuple(horizons)
-    stage_f = {h: fs["stage"] + (AM_STAGE if h <= AM_MAX_H else []) for h in hs}
+    # rate of rise at every horizon: forecast mode days 3-7 -2 to -4.5 % (experiments/improve/i4_fc_report.txt)
+    stage_f = {h: fs["stage"] + (AM_STAGE if h <= AM_MAX_H else []) + SLOPES for h in hs}
     flow_f = {h: fs["flow"] + (AM_FLOW if h <= AM_MAX_H else []) for h in hs}
-    a = arx.ARX(stage_f, hs, backend="lgbm", allow_missing=AM_STAGE, lgbm_params=LGBM_PARAMS)
+    a = arx.ARX(stage_f, hs, backend="lgbm", allow_missing=AM_STAGE + SLOPES, lgbm_params=LGBM_PARAMS)
     b = hybrid.RatingHybrid(
         direct.DirectRegressor("log_q", flow_f, hs, backend="lgbm", allow_missing=AM_FLOW, lgbm_params=LGBM_PARAMS),
         direct.DirectRegressor("toho", fs["lake"], hs, backend="lgbm", lgbm_params=LGBM_PARAMS),

@@ -106,5 +106,5 @@ where the gain was clear. Scripts and reports: `experiments/improve/`. The test 
 | — | Log keeps the issued forecast (items 2–3) | First logged forecast of an issue day kept; reruns only fill gaps | **Fixed** (`forecast_log.append`). NWM value is still a partial-day mean |
 | 3a | Era-aware rating | Rating refit on years near the held-out block: MAE unchanged, flood days at days 5–7 worse | Rejected |
 | 3b | Era-aware GR4J | Calibrated 2008–21: better flow fit, forecast unchanged at days 1–5, day 7 +1.2 % worse | Rejected |
-| 4 | Rate of rise (6 h / 12 h, gauge and upstream) | Day 1 (in the anchored model): −2.4 %, CI −0.0007..−0.0003 | **Built** for day 1 |
+| 4 | Rate of rise (6 h / 12 h, gauge and upstream) | Day 1 (in the anchored model): −2.4 %, CI −0.0007..−0.0003. Stage model, all horizons, forecast mode: days 3–7 −1.9/−4.5/−2.6/−2.8/−2.5 %, all CIs < 0, low water mostly better; flood days mixed (14 days), day 5 worse in both harnesses (+9 % / +4.5 %). In the flow model too: floods and low water worse | **Built** for day 1 and the stage model; not the flow model |
 | 5 | 06Z GEFS run at issue | Available by ~11:03Z. Not pulled: the 12Z run (twice as fresh) gave −2.4..+2.4 % across days 1–7 in T6, worse at days 1 and 4; day 1 no longer depends on rain much | Not pursued |
