@@ -154,3 +154,11 @@ def test_day_one_comes_from_the_morning_anchored_model_when_readings_exist(train
     want = art.model.day1.point(d, pd.DatetimeIndex([day]))["h1"].iloc[0]
     assert np.isfinite(want) and fc["p50"].iloc[0] == pytest.approx(want)
     assert abs(want - data["stage_am"].loc[day]) < 0.5
+
+
+def test_oof_training_fits_the_intraday_update(trained_oof):
+    hist, raw, src, art = trained_oof
+    nc = art.meta["nowcast"]
+
+    assert nc["n"][0] == 9 and nc["n"][-1] == 23
+    assert all(0 < k <= 1.0 for k in nc["shrink"]) and nc["shrink"][-1] <= nc["shrink"][0]

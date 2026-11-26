@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from shingle import basin, config, fcst, fetch, forecast_log, grid, live, output, train
+from shingle import basin, config, fcst, fetch, forecast_log, grid, live, nowcast, output, train
 from shingle.sources import gefs, gridmet
 
 GEFS_BACKFILL_DAYS = 40
@@ -69,6 +70,24 @@ def forecast_doc(art: train.Artifact, hist: dict, raw: pd.DataFrame, src: pd.Dat
     return output.write_json(out_path, fc, current_stage=current[0], current_time=current[1], issue_day=day, rain_mm=rain, meta=meta)
 
 
+def update_today(doc: dict, nc: dict | None, hourly: pd.Series, now: pd.Timestamp) -> dict:
+    """Day 1 updated from the target-day hours seen since issue (shingle.nowcast); the issued value is kept in
+    'updated'. No change at the issue run, without a fitted nowcast, or when recent hours are missing."""
+    if not nc or not doc["forecast"]:
+        return doc
+    seen = nowcast.seen_hours(hourly, pd.Timestamp(doc["issue_day"]), now)
+    if len(seen) <= nowcast.ISSUE_HOURS or np.isnan(seen).sum() > 2 or np.isnan(seen[-3:]).all():
+        return doc
+    d1 = doc["forecast"][0]
+    if d1.get("p50") is None:
+        return doc
+    lo, mid, hi = nowcast.apply(nc, d1["p10"], d1["p50"], d1["p90"], seen)
+    through = pd.Timestamp(doc["issue_day"]) + pd.Timedelta(days=1, hours=nowcast.FIRST + len(seen) - 1)
+    d1["updated"] = {"hours_seen": len(seen), "issued_p50": d1["p50"], "through": through.tz_localize("UTC").isoformat()}
+    d1.update(p10=round(lo, 2), p50=round(mid, 2), p90=round(hi, 2), category=output.flood_category(mid), p90_category=output.flood_category(hi))
+    return doc
+
+
 def radar_cell_means(data_dir: Path, cells: pd.DataFrame) -> pd.DataFrame | None:
     try:
         px = fetch.load_mrms(data_dir, hour=12)
@@ -126,7 +145,10 @@ def predict_from_disk(data_dir: Path, model_path: Path, out_path: Path, update: 
     doc = forecast_doc(art, hist, raw, src, radar, issue, out_path, current)
     toho = hist["lakes"]["toho_stage"].dropna()
     nwm_h1 = nwm_stage_h1(art.model.b.rating, issue, float(toho.iloc[-1]) if len(toho) else float("nan"))
-    forecast_log.append(log_path, doc, nwm_h1)
+    forecast_log.append(log_path, doc, nwm_h1)  # the log keeps the forecast as issued
+    doc = update_today(doc, art.meta.get("nowcast"), iv["stage_ft"], pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now))
+    if "updated" in doc["forecast"][0]:
+        Path(out_path).write_text(json.dumps(doc, indent=2))
     return doc
 
 

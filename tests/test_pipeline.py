@@ -103,3 +103,21 @@ def test_forecast_rain_shows_unscaled_gefs_basin_rain():
     rain = pipeline.forecast_rain(art, cells, raw, src, day)
     assert np.allclose(rain.to_numpy(), [10.0, 2.0])
     assert list(rain.index) == [day + pd.Timedelta(days=1), day + pd.Timedelta(days=2)]
+
+
+def test_update_today_moves_day_one_toward_the_hours_seen_and_marks_it():
+    doc = {"issue_day": "2024-10-09", "forecast": [{"date": "2024-10-10", "p10": 55.0, "p50": 57.0, "p90": 59.0, "category": "normal"},
+                                                    {"date": "2024-10-11", "p10": 55.0, "p50": 57.0, "p90": 59.0, "category": "normal"}]}
+    t = pd.date_range("2024-10-10 00:00", "2024-10-11 06:00", freq="1h", tz="UTC")
+    hourly = pd.Series(56.0, index=t)
+    nc = {"n": [9, 23], "a": [1.0, 0.0], "shrink": [1.0, 0.1]}
+
+    morning = pipeline.update_today(json.loads(json.dumps(doc)), nc, hourly, now=pd.Timestamp("2024-10-10 13:35", tz="UTC"))
+    late = pipeline.update_today(json.loads(json.dumps(doc)), nc, hourly, now=pd.Timestamp("2024-10-11 04:40", tz="UTC"))
+
+    assert morning["forecast"][0]["p50"] == 57.0 and "updated" not in morning["forecast"][0]  # issue run: as issued
+    d1 = late["forecast"][0]
+    assert d1["p50"] == pytest.approx(56.0) and d1["p90"] - d1["p10"] == pytest.approx(0.4)
+    assert d1["updated"] == {"hours_seen": 23, "issued_p50": 57.0, "through": "2024-10-11T03:00:00+00:00"}
+    assert late["forecast"][1] == doc["forecast"][1]
+    assert pipeline.update_today(json.loads(json.dumps(doc)), None, hourly, now=pd.Timestamp("2024-10-11 04:40", tz="UTC")) == doc

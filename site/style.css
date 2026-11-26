@@ -126,6 +126,7 @@ a:hover { color: var(--fc); }
 .week td:first-child { font-family: var(--font); font-weight: 600; }
 .week .flag { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-left: 6px; vertical-align: 1px; }
 .note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+.upd { font-size: 11px; line-height: 1.3; color: var(--muted); }
 
 /* ---------- panels ---------- */
 .panel {

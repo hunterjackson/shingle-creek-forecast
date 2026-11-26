@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from shingle import bands, config, dataset, fcst, gr4j_driver, live, spec
+from shingle import bands, config, dataset, fcst, gr4j_driver, live, nowcast, spec
 from shingle.evaluate import BinnedConformal
 from shingle.models.base import HORIZONS, targets
 
@@ -127,6 +127,7 @@ def train(
     scale = fcst.fit_scale(plain["pr"], data["pr"], config.RAIN_CELL, fc_idx)
     d_fc = _forecast_data(data, hist, raw, src, drv, scale, horizons)
 
+    nc = None
     if oof_years:
         parts = []
         for yr in sorted(set(fc_idx.year)):
@@ -135,6 +136,8 @@ def train(
             parts.append(m.point(d_fc, held))
         preds_fc = pd.concat(parts)
         _set_bands(model, preds_fc, d_fc, fc_idx)
+        if 1 in horizons and (hist.get("iv") or {}).get("gauge") is not None:
+            nc = nowcast.fit(preds_fc["h1"], hist["iv"]["gauge"]["stage_ft"], data["stage"])
         learned = [h for h in horizons if h >= LEARNED_BANDS_FROM_H]
         scaled = [h for h in horizons if h >= LEARNED_BANDS_FROM_H or h <= WET_BANDS_MAX_H]
         pre = tr[tr < pd.Timestamp(fcst_start)]
@@ -144,8 +147,10 @@ def train(
     else:
         model.calibrate(d_fc, fc_idx)
 
-    return Artifact(model, drv, scale, live.pet_climatology(hist["pet"]), horizons, str(train_end), str(fcst_start),
-                    meta={"n_train": len(tr), "n_calib": len(fc_idx), "oof_years": oof_years})
+    meta = {"n_train": len(tr), "n_calib": len(fc_idx), "oof_years": oof_years}
+    if nc is not None:
+        meta["nowcast"] = nc
+    return Artifact(model, drv, scale, live.pet_climatology(hist["pet"]), horizons, str(train_end), str(fcst_start), meta=meta)
 
 
 def predict(art: Artifact, hist: dict, raw: pd.DataFrame, src: pd.DataFrame, issue_day) -> pd.DataFrame:

@@ -150,10 +150,17 @@ function renderWeek(fc) {
     el("td", {}, tr, fmtDay(day(r.date)));
     const exp = el("td", {}, tr, ft(r.p50));
     if (r.category && r.category !== "normal") addFlag(exp, r.category);
+    if (r.updated) el("div", { class: "upd" }, exp, `updated ${upTime(r.updated)}, issued ${ft(r.updated.issued_p50)}`);
     const rng = el("td", {}, tr, `${ft(r.p10)}–${ft(r.p90)}`);
     if (r.p90_category && r.p90_category !== "normal" && r.p90_category !== r.category) addFlag(rng, r.p90_category);
     el("td", {}, tr, r.rain_mm === null || r.rain_mm === undefined ? "—" : `${(r.rain_mm / 25.4).toFixed(2)} in`);
   }
+}
+
+// day 1 is re-estimated from the readings as the day goes on (the scored forecast stays the issued one)
+function upTime(u) {
+  const t = new Date(new Date(u.through).getTime() + 3600e3);
+  return t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
 }
 
 function addFlag(cell, cat) {
@@ -314,7 +321,7 @@ function renderHydro(fc, obs) {
   // hover / keyboard layer: snap to the nearest calendar day
   const days = new Map();
   for (const r of obs.daily || []) if (r.stage !== null && day(r.date) >= start) days.set(r.date, { obs: r.stage });
-  for (const r of rows) days.set(r.date, Object.assign(days.get(r.date) || {}, { p50: r.p50, p10: r.p10, p90: r.p90 }));
+  for (const r of rows) days.set(r.date, Object.assign(days.get(r.date) || {}, { p50: r.p50, p10: r.p10, p90: r.p90, updated: r.updated }));
   // the day in progress has no daily mean yet: show the latest reading and the average of today's readings so far
   for (const [k, d] of days) {
     const [a, b] = gaugeDay(k);
@@ -342,7 +349,11 @@ function renderHydro(fc, obs) {
       row(tip, "--obs", ft(d.latest.v), `latest reading, ${at}`);
       row(tip, "--obs", ft(d.soFar), "average so far today");
     }
-    if (d.p50 !== undefined) { row(tip, "--fc", ft(d.p50), "expected daily average"); row(tip, null, `${ft(d.p10)}–${ft(d.p90)}`, "likely range"); }
+    if (d.p50 !== undefined) {
+      row(tip, "--fc", ft(d.p50), d.updated ? `expected daily average, updated with readings to ${upTime(d.updated)}` : "expected daily average");
+      row(tip, null, `${ft(d.p10)}–${ft(d.p90)}`, "likely range");
+      if (d.updated) row(tip, null, ft(d.updated.issued_p50), "issued this morning (the forecast that is scored)");
+    }
     tip.hidden = false;
     const r = svg.getBoundingClientRect();
     const px = clientX ?? r.left + cx * (r.width / W), py = clientY ?? r.top + r.height * 0.3;
