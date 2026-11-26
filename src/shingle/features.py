@@ -23,6 +23,8 @@ only for longer horizons).
   stage_am_d, log_q_am_d, log_q_up_am_d
                        issue-time (next-morning) instantaneous reading minus day-t mean
                        (data['stage_am'|'q_am'|'q_up_am'], see dataset.issue_reading)
+  stage_sofar_d        mean of the day-1 target's hours seen at issue (midnight..8 am EST) minus the
+                       issue reading (data['stage_sofar'], see dataset.morning_mean)
 
 `data` keys: stage, q, q_up (Series); pr, pet (wide per-cell frames);
 toho, s61_q, s59_q, etoho (Series) when lake features are used.
@@ -90,6 +92,10 @@ def _one(data: dict, name: str, horizon: int | None, index: pd.DatetimeIndex) ->
         return np.log1p(data["s59_q"].clip(lower=0))
     if name == "etoho":
         return data["etoho"]
+    if name == "stage_sofar_d":
+        if "stage_sofar" not in data or "stage_am" not in data:
+            return pd.Series(np.nan, index=index)
+        return data["stage_sofar"] - data["stage_am"]
     if name in ("stage_am_d", "log_q_am_d", "log_q_up_am_d"):
         key = {"stage_am_d": "stage_am", "log_q_am_d": "q_am", "log_q_up_am_d": "q_up_am"}[name]
         if key not in data:  # no intraday feed -> missing (models learned a missing-value branch pre-2007)

@@ -20,6 +20,19 @@ def issue_reading(hourly: pd.Series, index: pd.DatetimeIndex, hour_utc: int = IS
     return last.reindex(index)
 
 
+def morning_mean(hourly: pd.Series, index: pd.DatetimeIndex, first_hour_utc: int = 5, hour_utc: int = ISSUE_HOUR_UTC) -> pd.Series:
+    """Mean of the hourly values labelled first_hour_utc..hour_utc on day t+1 (UTC), labelled t.
+
+    05Z is midnight EST, when the gauge's daily mean for t+1 starts: this is the part of the day-1 target
+    already observed at issue (05Z..12Z = midnight to 8 am EST).
+    """
+    s = hourly.dropna()
+    s = s[(s.index.hour >= first_hour_utc) & (s.index.hour <= hour_utc)]
+    m = s.groupby(s.index.tz_localize(None).normalize()).mean()
+    m.index = m.index - pd.Timedelta(days=1)
+    return m.reindex(index)
+
+
 def build_data(history: dict, rain: pd.DataFrame | None = None, pet: pd.DataFrame | None = None) -> dict:
     """Align everything on the Campbell gauge's daily index.
 
@@ -46,6 +59,7 @@ def build_data(history: dict, rain: pd.DataFrame | None = None, pet: pd.DataFram
     if iv.get("gauge") is not None:
         d["stage_am"] = issue_reading(iv["gauge"]["stage_ft"], idx)
         d["q_am"] = issue_reading(iv["gauge"]["discharge_cfs"], idx)
+        d["stage_sofar"] = morning_mean(iv["gauge"]["stage_ft"], idx)
     if iv.get("upstream") is not None:
         d["q_up_am"] = issue_reading(iv["upstream"]["discharge_cfs"], idx)
     return d

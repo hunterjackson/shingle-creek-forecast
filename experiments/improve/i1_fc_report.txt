@@ -1,0 +1,8 @@
+Idea 1, forecast mode (issued GEFS), 1185 issue days 2020-10..2023-12, leave-one-year-out
+
+                MAE  vs prod %    lo90    hi90  moving  flood (n=14)     low
+model                                                                       
+prod         0.0345     0.0000  0.0000  0.0000  0.0678        0.2930  0.0209
+persist am   0.0263   -23.6856 -0.0139 -0.0042  0.0505        0.0905  0.0218
+arx_am (L2)  0.0204   -40.9280 -0.0227 -0.0080  0.0342        0.0250  0.0185
+arx_am (L1)  0.0194   -43.8354 -0.0232 -0.0091  0.0329        0.0208  0.0191

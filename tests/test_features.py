@@ -219,3 +219,12 @@ def test_issue_time_features_are_nan_when_readings_absent(data):
     X = features.build(data, ["stage_am_d", "log_q_am_d", "log_q_up_am_d"])
 
     assert X.isna().all().all()
+
+
+def test_morning_mean_feature_is_mean_so_far_minus_issue_reading(data):
+    d = dict(data, stage_am=data["stage"] + 0.3, stage_sofar=data["stage"] + 0.1)
+
+    X = features.build(d, ["stage_sofar_d"])
+
+    np.testing.assert_allclose(X["stage_sofar_d"], -0.2)
+    assert features.build(data, ["stage_sofar_d"])["stage_sofar_d"].isna().all()
