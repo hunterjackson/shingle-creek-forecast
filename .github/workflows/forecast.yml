@@ -53,7 +53,7 @@ jobs:
       # Nothing is logged or written to the site until the fetch succeeds.
       - name: Forecast
         env:
-          # Earth Engine copy of gridMET, used only when the THREDDS server is down
+          # Earth Engine copy of gridMET: the primary source (THREDDS tops up the newest day)
           EE_SERVICE_ACCOUNT_KEY: ${{ secrets.EE_SERVICE_ACCOUNT_KEY }}
           EE_PROJECT: ${{ vars.EE_PROJECT }}
         run: |

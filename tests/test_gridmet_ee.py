@@ -74,7 +74,7 @@ def test_fetch_history_falls_back_to_earth_engine_when_thredds_is_down(tmp_path,
     pr = pd.read_parquet(tmp_path / "gridmet_pr.parquet")
     assert pr.index.max() == pd.Timestamp("2020-01-14") and (pr.loc["2020-01-11":] == 9.0).all().all()
     assert {a[0] for a in asked} == {"pr", "pet"}
-    assert "using Earth Engine" in capsys.readouterr().err
+    assert "gridMET unreachable" in capsys.readouterr().err
 
 
 def test_fetch_history_keeps_the_cache_when_earth_engine_also_fails(tmp_path, monkeypatch, capsys, fake_sources):
@@ -118,3 +118,43 @@ def test_fetch_splits_long_ranges_under_the_5000_element_limit(monkeypatch):
     assert all((pd.Timestamp(e) - pd.Timestamp(s)).days + 1 <= 5000 // 88 for s, e in calls)
     assert calls[0][0] == "2026-09-01" and calls[-1][1] == "2026-11-27"
     assert len(df) == 88 and df.index.is_unique
+
+
+def _ee_env(monkeypatch):
+    monkeypatch.setenv("EE_SERVICE_ACCOUNT_KEY", KEY)
+    monkeypatch.setenv("EE_PROJECT", "proj")
+
+
+def test_earth_engine_is_primary_and_thredds_only_tops_up_the_newest_day(tmp_path, monkeypatch, fake_sources):
+    asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-10", start="2020-01-01"))
+    _ee_env(monkeypatch)
+    thredds = []
+
+    async def fake_thredds(var, bbox, start, end, client=None):
+        thredds.append((var, start, end))
+        return pd.DataFrame({c: 5.0 for c in ("28.3750_-81.4583", "28.9000_-80.0000")}, index=pd.date_range(start, end, name="date"))
+
+    async def fake_ee(var, cells, start, end):  # one day behind THREDDS
+        return pd.DataFrame({c: 9.0 for c in cells.index}, index=pd.date_range(start, pd.Timestamp(end) - pd.Timedelta(days=2), name="date"))
+
+    monkeypatch.setattr(gridmet, "fetch", fake_thredds)
+    monkeypatch.setattr(gridmet_ee, "fetch", fake_ee)
+    asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-14", start="2020-01-01"))
+    pr = pd.read_parquet(tmp_path / "gridmet_pr.parquet")
+    assert (pr.loc["2020-01-11":"2020-01-12"] == 9.0).all().all()  # from Earth Engine
+    assert (pr.loc["2020-01-13":] == 5.0).all().all()  # newest days topped up from THREDDS
+    assert {v for v, _, _ in thredds} == {"pr", "pet"}
+    assert all(pd.Timestamp(s) >= pd.Timestamp("2020-01-12") for _, s, _ in thredds)  # only the tail, no 10-day re-fetch
+
+
+def test_thredds_is_used_when_earth_engine_fails(tmp_path, monkeypatch, capsys, fake_sources):
+    asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-10", start="2020-01-01"))
+    _ee_env(monkeypatch)
+
+    async def broken_ee(var, cells, start, end):
+        raise RuntimeError("Earth Engine said no")
+
+    monkeypatch.setattr(gridmet_ee, "fetch", broken_ee)
+    asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-14", start="2020-01-01"))
+    assert pd.read_parquet(tmp_path / "gridmet_pr.parquet").index.max() == pd.Timestamp("2020-01-14")
+    assert "Earth Engine failed" in capsys.readouterr().err

@@ -1,5 +1,5 @@
-"""gridMET from Google Earth Engine (IDAHO_EPSCOR/GRIDMET), the backup when the University of Idaho THREDDS
-server is unreachable. Same dataset and grid, so values are sampled at our cell centres and returned in the
+"""gridMET from Google Earth Engine (IDAHO_EPSCOR/GRIDMET), the primary gridMET source; the University of Idaho
+THREDDS server (gridmet.py) tops up the newest day and covers Earth Engine failures. Same dataset and grid, so values are sampled at our cell centres and returned in the
 gridmet.fetch layout (index=date, columns=cell ids, mm).
 
 Credentials come from the environment: EE_SERVICE_ACCOUNT_KEY (the service account's JSON key) and EE_PROJECT

@@ -54,31 +54,33 @@ async def fetch_history(
     """
     data_dir = Path(data_dir)
 
-    def daily(name: str, fn):
+    def daily(name: str, fn, overlap_days: int = 10):
         return cache.update_daily(
-            data_dir / f"{name}.parquet", fn, default_start=start, today=today, refresh=refresh, revise_every=revise_every
+            data_dir / f"{name}.parquet", fn, default_start=start, today=today, refresh=refresh, revise_every=revise_every,
+            overlap_days=overlap_days,
         )
 
     async def gridmet_update(name: str, var: str) -> pd.DataFrame:
-        # gridMET's THREDDS server has been unreachable for hours at a time. Then try the same dataset on
-        # Earth Engine (when credentials are set), and failing that keep the cache: the forecast fills rain
-        # after gridMET's last cached day from radar (live.fill_rain) and PET from climatology.
+        # Earth Engine's copy of gridMET is the primary source: the University of Idaho THREDDS server has been
+        # unreachable for hours at a time. Earth Engine runs about a day behind, so THREDDS then tops up whatever
+        # is still missing (usually the newest day; nothing at all when the cache is current). If both fail the
+        # cache is kept: the forecast fills rain after gridMET's last day from radar and PET from climatology.
         path = data_dir / f"{name}.parquet"
+        overlap = 10
+        if gridmet_ee.configured() and path.exists():  # Earth Engine needs the cell list from an existing cache
+            cells = gridmet.cells_from_columns(pd.read_parquet(path).columns)
+            try:
+                await daily(name, lambda s, e: gridmet_ee.fetch(var, cells, s, e))
+                overlap = -1  # Earth Engine did any revision pass; THREDDS starts the day after its last one
+            except Exception as e:  # any Earth Engine problem (auth, quota, API) falls through to THREDDS
+                print(f"::warning::Earth Engine failed ({type(e).__name__}: {e})", file=sys.stderr)
         try:
-            return await daily(name, lambda s, e: gridmet.fetch(var, config.BBOX, s, e))
+            return await daily(name, lambda s, e: gridmet.fetch(var, config.BBOX, s, e), overlap_days=overlap)
         except httpx.HTTPError as e:
             if not path.exists():
                 raise
-            print(f"::warning::gridMET unreachable ({type(e).__name__}: {e})", file=sys.stderr)
-        if gridmet_ee.configured():
-            cells = gridmet.cells_from_columns(pd.read_parquet(path).columns)
-            try:
-                df = await daily(name, lambda s, e: gridmet_ee.fetch(var, cells, s, e))
-                print(f"::warning::using Earth Engine for {name} (through {df.index.max().date()})", file=sys.stderr)
-                return df
-            except Exception as e:  # any Earth Engine problem (auth, quota, API) falls through to the cache
-                print(f"::warning::Earth Engine failed ({type(e).__name__}: {e})", file=sys.stderr)
-        print(f"::warning::using the cached {name}", file=sys.stderr)
+            print(f"::warning::gridMET unreachable ({type(e).__name__}: {e}); using the cached {name} "
+                  f"(through {pd.read_parquet(path).index.max().date()})", file=sys.stderr)
         return pd.read_parquet(path)
 
     tasks = {}

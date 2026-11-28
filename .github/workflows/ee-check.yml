@@ -1,7 +1,7 @@
 name: Earth Engine check
 
 # Manual: confirms the Earth Engine credentials work and that its gridMET copy matches the
-# THREDDS cache (the forecast falls back to it when THREDDS is down).
+# THREDDS cache (the forecast uses it as its primary gridMET source).
 on:
   workflow_dispatch:
 
