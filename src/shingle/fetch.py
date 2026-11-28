@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Awaitable
 
+import httpx
 import pandas as pd
 
 from shingle import basin as basin_mod
@@ -58,11 +59,24 @@ async def fetch_history(
             data_dir / f"{name}.parquet", fn, default_start=start, today=today, refresh=refresh, revise_every=revise_every
         )
 
+    async def stale_ok(name: str, update: Awaitable[pd.DataFrame]) -> pd.DataFrame:
+        # gridMET's server has been unreachable for hours at a time. The forecast fills rain after gridMET's
+        # last cached day from radar (live.fill_rain) and PET from climatology, so a stale cache is usable.
+        path = data_dir / f"{name}.parquet"
+        try:
+            return await update
+        except httpx.HTTPError as e:
+            if not path.exists():
+                raise
+            print(f"::warning::gridMET unreachable ({type(e).__name__}: {e}); using the cached {name}", file=sys.stderr)
+            return pd.read_parquet(path)
+
     tasks = {}
     for site in (config.SITE, config.UPSTREAM_SITE):
         tasks[f"usgs_{site}"] = daily(f"usgs_{site}", lambda s, e, site=site: usgs.fetch_dv(site, s, e))
     for var in gridmet.VARS:
-        tasks[f"gridmet_{var}"] = daily(f"gridmet_{var}", lambda s, e, var=var: gridmet.fetch(var, config.BBOX, s, e))
+        name = f"gridmet_{var}"
+        tasks[name] = stale_ok(name, daily(name, lambda s, e, var=var: gridmet.fetch(var, config.BBOX, s, e)))
     tasks["dbhydro"] = daily("dbhydro", lambda s, e: dbhydro.fetch(dbhydro.all_dbkeys(), s, e))
     tasks["basin"] = cache.cached_json(
         data_dir / "basin.geojson", lambda: nldi.fetch_basin_geojson(config.SITE), refresh=refresh

@@ -336,3 +336,32 @@ def test_fetch_iv_history_between_revision_passes_asks_only_from_the_last_hour(t
     run("2023-03-11T10:00", 21)
 
     assert calls == ["2023-03-01T00:00Z", "2023-03-10T12:00Z", "2023-03-07T00:00Z"]
+
+
+def test_fetch_history_keeps_cached_gridmet_when_server_is_down(tmp_path, fake_sources, monkeypatch, capsys):
+    # gridMET's server has gone unreachable for hours at a time; the forecast fills days after gridMET's last
+    # cached day from radar, so a stale gridMET cache is usable and the run should carry on with a warning.
+    import httpx
+
+    asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-10", start="2020-01-01"))
+    before = pd.read_parquet(tmp_path / "gridmet_pr.parquet")
+
+    async def down(var, bbox, start, end, client=None):
+        raise httpx.ConnectError("All connection attempts failed")
+
+    monkeypatch.setattr(gridmet, "fetch", down)
+    asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-14", start="2020-01-01"))
+    pd.testing.assert_frame_equal(pd.read_parquet(tmp_path / "gridmet_pr.parquet"), before)
+    assert pd.read_parquet(tmp_path / f"usgs_{config.SITE}.parquet").index.max() == pd.Timestamp("2020-01-14")
+    assert "gridMET unreachable" in capsys.readouterr().err
+
+
+def test_fetch_history_still_fails_when_gridmet_is_down_and_nothing_is_cached(tmp_path, fake_sources, monkeypatch):
+    import httpx
+
+    async def down(var, bbox, start, end, client=None):
+        raise httpx.ConnectError("All connection attempts failed")
+
+    monkeypatch.setattr(gridmet, "fetch", down)
+    with pytest.raises(httpx.ConnectError):
+        asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-10", start="2020-01-01"))
