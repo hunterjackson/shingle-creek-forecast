@@ -47,7 +47,7 @@ def test_fetch_uses_the_band_cells_and_inclusive_end(monkeypatch):
     monkeypatch.setattr(gridmet_ee, "_sample", fake_sample)
     cells = gridmet.cells_from_columns(["28.6083_-81.6000", "28.5667_-81.6000"])
     df = asyncio.run(gridmet_ee.fetch("pet", cells, "2026-11-19", "2026-11-21"))
-    assert seen == {"band": "pet", "cells": list(cells.index), "start": "2026-11-19", "end": "2026-11-21"}
+    assert seen == {"band": "eto", "cells": list(cells.index), "start": "2026-11-19", "end": "2026-11-21"}
     assert df.shape == (3, 2)
 
 

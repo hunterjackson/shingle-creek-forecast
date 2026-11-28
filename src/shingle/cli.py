@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> None:
 
     p_ee = sub.add_parser("ee-check", help="compare gridMET from Earth Engine (the backup) with the cached THREDDS copy")
     p_ee.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
-    p_ee.add_argument("--days", type=int, default=60)
+    p_ee.add_argument("--days", type=int, default=20)
 
     args = parser.parse_args(argv)
     if args.cmd == "fetch":

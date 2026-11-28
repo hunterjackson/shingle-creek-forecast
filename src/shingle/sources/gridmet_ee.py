@@ -16,7 +16,7 @@ import pandas as pd
 
 COLLECTION = "IDAHO_EPSCOR/GRIDMET"
 SCALE_M = 4638.3  # gridMET's native 1/24 degree grid in Earth Engine
-BANDS = {"pr": "pr", "pet": "pet"}  # our short name -> Earth Engine band
+BANDS = {"pr": "pr", "pet": "eto"}  # our short name -> Earth Engine band (eto = grass reference ET, our pet)
 
 
 def configured() -> bool:
