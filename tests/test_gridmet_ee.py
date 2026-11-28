@@ -103,3 +103,18 @@ def test_compare_reports_overlap_differences_and_last_days():
     assert r["overlap_days"] == 8 and r["cells"] == 2
     assert r["max_abs_diff"] == pytest.approx(0.3) and r["cached_last"] == "2026-11-10" and r["ee_last"] == "2026-11-11"
     assert r["missing_cells"] == 0
+
+
+def test_fetch_splits_long_ranges_under_the_5000_element_limit(monkeypatch):
+    calls = []
+
+    def fake_sample(band, cells, start, end):
+        calls.append((start, end))
+        return [(d.strftime("%Y%m%d"), c, 1.0) for d in pd.date_range(start, end) for c in cells.index]
+
+    monkeypatch.setattr(gridmet_ee, "_sample", fake_sample)
+    cells = gridmet.cells_from_columns([f"28.{i:04d}_-81.6000" for i in range(88)])
+    df = asyncio.run(gridmet_ee.fetch("pr", cells, "2026-09-01", "2026-11-27"))
+    assert all((pd.Timestamp(e) - pd.Timestamp(s)).days + 1 <= 5000 // 88 for s, e in calls)
+    assert calls[0][0] == "2026-09-01" and calls[-1][1] == "2026-11-27"
+    assert len(df) == 88 and df.index.is_unique

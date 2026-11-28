@@ -63,7 +63,12 @@ def to_frame(rows, cells) -> pd.DataFrame:
 
 async def fetch(var: str, cells: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
     """gridMET `var` ("pr" or "pet") for `cells` (index=cell id, columns lat/lon) over [start, end]."""
-    rows = await asyncio.to_thread(_sample, BANDS[var], cells, start, end)
+    # Earth Engine aborts a query past 5000 elements (one per cell per day), so ask in windows that fit.
+    span = max(1, 4500 // max(1, len(cells)))
+    rows = []
+    for s in pd.date_range(start, end, freq=f"{span}D"):
+        e = min(s + pd.Timedelta(days=span - 1), pd.Timestamp(end))
+        rows += await asyncio.to_thread(_sample, BANDS[var], cells, s.strftime("%Y-%m-%d"), e.strftime("%Y-%m-%d"))
     return to_frame(rows, cells.index)
 
 
