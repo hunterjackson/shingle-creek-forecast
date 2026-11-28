@@ -14,7 +14,7 @@ import pandas as pd
 
 from shingle import basin as basin_mod
 from shingle import cache, config
-from shingle.sources import dbhydro, gridmet, http, nldi, usgs
+from shingle.sources import dbhydro, gridmet, gridmet_ee, http, nldi, usgs
 
 
 async def run_all(tasks: dict[str, Awaitable[Any]], label: str = "") -> dict[str, Any]:
@@ -59,24 +59,33 @@ async def fetch_history(
             data_dir / f"{name}.parquet", fn, default_start=start, today=today, refresh=refresh, revise_every=revise_every
         )
 
-    async def stale_ok(name: str, update: Awaitable[pd.DataFrame]) -> pd.DataFrame:
-        # gridMET's server has been unreachable for hours at a time. The forecast fills rain after gridMET's
-        # last cached day from radar (live.fill_rain) and PET from climatology, so a stale cache is usable.
+    async def gridmet_update(name: str, var: str) -> pd.DataFrame:
+        # gridMET's THREDDS server has been unreachable for hours at a time. Then try the same dataset on
+        # Earth Engine (when credentials are set), and failing that keep the cache: the forecast fills rain
+        # after gridMET's last cached day from radar (live.fill_rain) and PET from climatology.
         path = data_dir / f"{name}.parquet"
         try:
-            return await update
+            return await daily(name, lambda s, e: gridmet.fetch(var, config.BBOX, s, e))
         except httpx.HTTPError as e:
             if not path.exists():
                 raise
-            print(f"::warning::gridMET unreachable ({type(e).__name__}: {e}); using the cached {name}", file=sys.stderr)
-            return pd.read_parquet(path)
+            print(f"::warning::gridMET unreachable ({type(e).__name__}: {e})", file=sys.stderr)
+        if gridmet_ee.configured():
+            cells = gridmet.cells_from_columns(pd.read_parquet(path).columns)
+            try:
+                df = await daily(name, lambda s, e: gridmet_ee.fetch(var, cells, s, e))
+                print(f"::warning::using Earth Engine for {name} (through {df.index.max().date()})", file=sys.stderr)
+                return df
+            except Exception as e:  # any Earth Engine problem (auth, quota, API) falls through to the cache
+                print(f"::warning::Earth Engine failed ({type(e).__name__}: {e})", file=sys.stderr)
+        print(f"::warning::using the cached {name}", file=sys.stderr)
+        return pd.read_parquet(path)
 
     tasks = {}
     for site in (config.SITE, config.UPSTREAM_SITE):
         tasks[f"usgs_{site}"] = daily(f"usgs_{site}", lambda s, e, site=site: usgs.fetch_dv(site, s, e))
     for var in gridmet.VARS:
-        name = f"gridmet_{var}"
-        tasks[name] = stale_ok(name, daily(name, lambda s, e, var=var: gridmet.fetch(var, config.BBOX, s, e)))
+        tasks[f"gridmet_{var}"] = gridmet_update(f"gridmet_{var}", var)
     tasks["dbhydro"] = daily("dbhydro", lambda s, e: dbhydro.fetch(dbhydro.all_dbkeys(), s, e))
     tasks["basin"] = cache.cached_json(
         data_dir / "basin.geojson", lambda: nldi.fetch_basin_geojson(config.SITE), refresh=refresh

@@ -1,0 +1,44 @@
+name: Earth Engine check
+
+# Manual: confirms the Earth Engine credentials work and that its gridMET copy matches the
+# THREDDS cache (the forecast falls back to it when THREDDS is down).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+
+      - name: Restore input cache
+        id: cache
+        uses: actions/cache/restore@v6
+        with:
+          path: data
+          key: inputs-${{ github.run_id }}
+          restore-keys: inputs-
+
+      - name: Download input history if the cache is empty
+        if: steps.cache.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download inputs --pattern inputs.tar.gz --clobber
+          tar -xzf inputs.tar.gz && rm inputs.tar.gz
+
+      - run: uv sync --locked
+
+      - name: Compare
+        env:
+          EE_SERVICE_ACCOUNT_KEY: ${{ secrets.EE_SERVICE_ACCOUNT_KEY }}
+          EE_PROJECT: ${{ vars.EE_PROJECT }}
+        run: uv run shingle ee-check

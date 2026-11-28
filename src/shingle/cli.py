@@ -42,6 +42,10 @@ def main(argv: list[str] | None = None) -> None:
     p_score.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
     p_score.add_argument("--log", type=Path, default=pipeline.LOG_PATH)
 
+    p_ee = sub.add_parser("ee-check", help="compare gridMET from Earth Engine (the backup) with the cached THREDDS copy")
+    p_ee.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
+    p_ee.add_argument("--days", type=int, default=60)
+
     args = parser.parse_args(argv)
     if args.cmd == "fetch":
         asyncio.run(fetch.fetch_history(args.data_dir, refresh=args.refresh))
@@ -56,5 +60,20 @@ def main(argv: list[str] | None = None) -> None:
         pipeline.predict_from_disk(args.data_dir, args.model, args.out, update=not args.no_update, log_path=args.log)
     elif args.cmd == "site":
         webdata.build(args.data_dir, args.forecast, args.log, args.out_dir)
+    elif args.cmd == "ee-check":
+        import pandas as pd
+
+        from shingle.sources import gridmet, gridmet_ee
+
+        bad = False
+        for var in gridmet.VARS:
+            cached = pd.read_parquet(args.data_dir / f"gridmet_{var}.parquet")
+            start = str((cached.index.max() - pd.Timedelta(days=args.days)).date())
+            end = str(pd.Timestamp.now().normalize().date())
+            ee_df = asyncio.run(gridmet_ee.fetch(var, gridmet.cells_from_columns(cached.columns), start, end))
+            r = gridmet_ee.compare(cached, ee_df)
+            print(var, r)
+            bad |= not (r["overlap_days"] > 0 and r["missing_cells"] == 0 and r["max_abs_diff"] <= 0.1)
+        raise SystemExit(1 if bad else 0)
     elif args.cmd == "score":
         print(pipeline.score_from_disk(args.data_dir, args.log).round(3).to_string())

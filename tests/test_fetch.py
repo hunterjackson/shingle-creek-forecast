@@ -343,6 +343,7 @@ def test_fetch_history_keeps_cached_gridmet_when_server_is_down(tmp_path, fake_s
     # cached day from radar, so a stale gridMET cache is usable and the run should carry on with a warning.
     import httpx
 
+    monkeypatch.delenv("EE_SERVICE_ACCOUNT_KEY", raising=False)  # no Earth Engine backup in this test
     asyncio.run(fetch.fetch_history(tmp_path, today="2020-01-10", start="2020-01-01"))
     before = pd.read_parquet(tmp_path / "gridmet_pr.parquet")
 

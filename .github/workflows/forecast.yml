@@ -52,6 +52,10 @@ jobs:
       # skip the run: fetches are incremental, so each retry is a handful of small requests.
       # Nothing is logged or written to the site until the fetch succeeds.
       - name: Forecast
+        env:
+          # Earth Engine copy of gridMET, used only when the THREDDS server is down
+          EE_SERVICE_ACCOUNT_KEY: ${{ secrets.EE_SERVICE_ACCOUNT_KEY }}
+          EE_PROJECT: ${{ vars.EE_PROJECT }}
         run: |
           for wait in 0 600 1200; do
             if [ "$wait" -gt 0 ]; then echo "::warning::predict failed; retrying in $((wait / 60)) min"; sleep "$wait"; fi
